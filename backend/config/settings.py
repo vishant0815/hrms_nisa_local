@@ -1,5 +1,6 @@
 """Django settings for the HRMS backend. Configuration comes from environment variables."""
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -36,6 +37,8 @@ INSTALLED_APPS = [
     "corsheaders",
     "apps.core",
     "apps.accounts",
+    "apps.stores",
+    "apps.employees",
 ]
 
 MIDDLEWARE = [
@@ -94,6 +97,10 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# Make the test suite fast: real password hashing is deliberately slow. Tests only.
+if "test" in sys.argv:
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "Europe/London"
