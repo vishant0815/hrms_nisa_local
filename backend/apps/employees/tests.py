@@ -450,6 +450,28 @@ class CoverRequestTests(EmployeeTestBase):
         self.assertIn("emp-a@example.com", visible_to_b())
         self.assertIn("emp-b@example.com", visible_to_b())
 
+    def test_destination_manager_sees_approved_cover_before_it_starts_but_not_after_it_ends(self):
+        """So next week's rota can be planned. Pending requests stay hidden; finished ones disappear."""
+        self.login(self.manager_a)
+        upcoming = self.client.post(reverse("cover-request-list"), {
+            "employee": self.employee.pk, "store": self.store_b.pk,
+            "valid_from": days_from_today(10).isoformat(), "valid_to": days_from_today(12).isoformat(),
+        })
+        self.assertEqual(upcoming.status_code, 201, upcoming.data)
+
+        def visible_to_b():
+            self.login(self.manager_b)
+            return {row["user"]["email"] for row in self.client.get(reverse("employee-list")).data}
+
+        self.assertNotIn("emp-a@example.com", visible_to_b())  # still pending
+        self.act(self.manager_b, upcoming.data["id"], "approve")
+        self.assertIn("emp-a@example.com", visible_to_b())  # approved, starts in 10 days
+
+        finished = StoreAssignment.objects.get(pk=upcoming.data["id"])
+        finished.valid_from, finished.valid_to = days_from_today(-5), days_from_today(-2)
+        finished.save()
+        self.assertNotIn("emp-a@example.com", visible_to_b())  # cover has ended
+
     def test_home_store_unchanged_by_cover(self):
         self.request(self.hr)
         self.assertEqual(services.home_store_on(self.employee, days_from_today(4)), self.store_a)
