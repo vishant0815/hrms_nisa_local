@@ -7,11 +7,11 @@ from django.utils import timezone as dj_timezone
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role
-from apps.core.testutils import days_from_today, make_user
+from apps.core.testutils import days_from_today, make_user, verified_term_letter
 from apps.employees import services as employee_services
 from apps.stores.models import Store, StoreHours
 from apps.visa import services as visa_services
-from apps.visa.models import EmployeeVisa, VacationPeriod, VisaType
+from apps.visa.models import EmployeeVisa, VisaType
 
 from . import services
 from .models import RotaWeek, Shift, ShiftStatus, ShiftTemplate, WeekStatus
@@ -95,9 +95,12 @@ class RotaTestBase(APITestCase):
     def warning_codes(self, response):
         return [warning["code"] for warning in response.data["warnings"]]
 
-    def make_student(self, email="student@example.com"):
+    def make_student(self, email="student@example.com", vacations=(), letter=True):
         student = self.hire(email, self.store_a)
         self.clear(student, "Student", expiry=day(300))
+        if letter:
+            visa = EmployeeVisa.objects.get(employee=student, is_current=True)
+            verified_term_letter(visa, self.hr, day(-30), day(250), vacations)
         return student
 
 
@@ -248,11 +251,30 @@ class AssignmentBlockTests(RotaTestBase):
             self.assertEqual(self.add(self.manager_a, self.week_a, student, n=n, end=end).status_code, 201)
 
     def test_vacation_lifts_the_cap(self):
-        student = self.make_student()
-        visa = EmployeeVisa.objects.get(employee=student, is_current=True)
-        VacationPeriod.objects.create(visa=visa, start_date=day(0), end_date=day(6))
+        student = self.make_student(vacations=[{"start_date": day(0), "end_date": day(6), "label": ""}])
         for n in range(3):
             self.assertEqual(self.add(self.manager_a, self.week_a, student, n=n).status_code, 201)  # 24 hours
+
+    def test_student_without_a_term_letter_is_rostered_with_a_warning_not_blocked(self):
+        student = self.make_student(letter=False)
+        response = self.add(self.manager_a, self.week_a, student, n=0)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIn("paperwork_needed", self.warning_codes(response))
+        body = json.dumps(response.data["warnings"], default=str).lower()
+        for leak in ("student", "visa", "letter", "university"):
+            self.assertNotIn(leak, body)
+
+    def test_student_with_a_verified_letter_has_no_paperwork_warning(self):
+        student = self.make_student()
+        response = self.add(self.manager_a, self.week_a, student, n=0)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertNotIn("paperwork_needed", self.warning_codes(response))
+
+    def test_the_cap_still_blocks_a_student_who_has_no_letter(self):
+        student = self.make_student(letter=False)
+        self.add(self.manager_a, self.week_a, student, n=0)
+        self.add(self.manager_a, self.week_a, student, n=1)
+        self.assertEqual(self.codes(self.add(self.manager_a, self.week_a, student, n=2)), ["hours_limit"])
 
     def test_a_person_from_another_store_is_not_visible_to_the_manager(self):
         response = self.add(self.manager_a, self.week_a, self.emp_b)

@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from .models import EmployeeVisa, RightToWorkCheck, VacationPeriod, VisaAuditLog
+from .models import EmployeeVisa, RightToWorkCheck, VisaAuditLog
 
 
 def audit(user, action, employee, visa=None, detail=""):
@@ -73,15 +73,6 @@ def revoke_visa(*, visa, by, reason=""):
     visa.save(update_fields=["revoked_on", "revoked_reason", "updated_at"])
     audit(by, "visa_revoked", visa.employee, visa)
     return visa
-
-
-@transaction.atomic
-def add_vacation(*, visa, by, start_date, end_date, label=""):
-    if end_date < start_date:
-        raise ValidationError({"end_date": "The end date cannot be before the start date."})
-    vacation = VacationPeriod.objects.create(visa=visa, start_date=start_date, end_date=end_date, label=label)
-    audit(by, "vacation_added", visa.employee, visa)
-    return vacation
 
 
 @transaction.atomic

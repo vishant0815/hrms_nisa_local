@@ -9,7 +9,7 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role
-from apps.core.testutils import days_from_today, make_user
+from apps.core.testutils import days_from_today, make_user, verified_term_letter
 from apps.employees import services as employee_services
 from apps.stores.models import Store
 
@@ -236,8 +236,9 @@ class WeeklyHoursCapTests(VisaTestBase):
 
     def test_vacation_lifts_the_cap_only_inside_the_period(self):
         visa = self.student()
-        services.add_vacation(
-            visa=visa, by=self.hr, start_date=days_from_today(10), end_date=days_from_today(20), label="Winter"
+        verified_term_letter(
+            visa, self.hr, days_from_today(-30), days_from_today(100),
+            [{"start_date": days_from_today(10), "end_date": days_from_today(20), "label": "Winter"}],
         )
         inside = self.decide(on=days_from_today(15), week_hours=Decimal("40"))
         self.assertTrue(inside.allowed)
@@ -249,7 +250,10 @@ class WeeklyHoursCapTests(VisaTestBase):
 
     def test_vacation_boundary_days_are_inside(self):
         visa = self.student()
-        services.add_vacation(visa=visa, by=self.hr, start_date=days_from_today(10), end_date=days_from_today(12))
+        verified_term_letter(
+            visa, self.hr, days_from_today(-30), days_from_today(100),
+            [{"start_date": days_from_today(10), "end_date": days_from_today(12), "label": ""}],
+        )
         for day in (10, 12):
             self.assertIsNone(self.decide(on=days_from_today(day)).weekly_hours_limit)
 
@@ -473,20 +477,18 @@ class VisaManagementTests(VisaTestBase):
         self.assertFalse(self.decide().allowed)
         self.assertEqual(self.client.post(url, {}).status_code, 400)
 
-    def test_vacation_periods(self):
+    def test_vacations_can_be_listed_but_not_added_by_hand(self):
         visa = self.give_visa(self.employee, "Student", expiry=days_from_today(300))
+        verified_term_letter(
+            visa, self.hr, days_from_today(-30), days_from_today(100),
+            [{"start_date": days_from_today(10), "end_date": days_from_today(20), "label": "Christmas"}],
+        )
         self.login(self.hr)
         url = reverse("visa-vacations", args=[visa.pk])
-        created = self.client.post(url, {
-            "start_date": days_from_today(10).isoformat(), "end_date": days_from_today(20).isoformat(),
-            "label": "Christmas",
-        })
-        self.assertEqual(created.status_code, 201, created.data)
         self.assertEqual(len(self.client.get(url).data), 1)
-        backwards = self.client.post(url, {
-            "start_date": days_from_today(20).isoformat(), "end_date": days_from_today(10).isoformat(),
-        })
-        self.assertEqual(backwards.status_code, 400)
+        self.assertEqual(self.client.post(url, {
+            "start_date": days_from_today(30).isoformat(), "end_date": days_from_today(40).isoformat(),
+        }).status_code, 405)
         self.assertEqual(VacationPeriod.objects.filter(visa=visa).count(), 1)
 
     def test_actions_are_written_to_the_audit_log_without_document_values(self):
@@ -647,7 +649,7 @@ class CanWorkApiTests(VisaTestBase):
         self.assertEqual(ok.status_code, 200)
         self.assertEqual(dict(ok.data), {
             "employee": self.employee.pk, "date": TODAY, "allowed": True,
-            "weekly_hours_limit": 20, "message": "",
+            "weekly_hours_limit": 20, "paperwork_needed": True, "message": "",
         })
         over = self.client.get(self.url(), {"week_hours": "25"})
         self.assertFalse(over.data["allowed"])

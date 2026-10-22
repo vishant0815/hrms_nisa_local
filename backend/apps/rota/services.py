@@ -144,6 +144,8 @@ def evaluate_assignment(*, store, employee, day, start, end, break_minutes, excl
             ))
         else:
             blocks.append(problem("not_cleared", "Not cleared to work. Please contact HR."))
+    elif decision.paperwork_needed:
+        warnings.append(problem("paperwork_needed", "Paperwork needed for this person. Please contact HR."))
 
     begins, finishes = shift_span(day, start, end)
     overlapped = False

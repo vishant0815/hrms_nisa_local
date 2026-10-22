@@ -17,6 +17,7 @@ htmlcov/
 db.sqlite3
 staticfiles/
 media/
+private_media/
 
 # Node
 node_modules/

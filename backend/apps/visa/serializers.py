@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from apps.employees.serializers import EmployeeBriefSerializer
 
-from .models import EmployeeVisa, RightToWorkCheck, VacationPeriod, VisaType
+from .models import EmployeeVisa, RightToWorkCheck, TermLetter, VacationPeriod, VisaType
 
 
 class VisaTypeSerializer(serializers.ModelSerializer):
@@ -12,7 +12,8 @@ class VisaTypeSerializer(serializers.ModelSerializer):
         model = VisaType
         fields = [
             "id", "name", "can_work", "requires_expiry", "max_weekly_hours",
-            "requires_sponsorship", "requires_manual_decision", "notes", "is_active",
+            "requires_sponsorship", "requires_manual_decision", "requires_term_letter",
+            "notes", "is_active",
         ]
         read_only_fields = ["id"]
 
@@ -84,15 +85,56 @@ class RevokeSerializer(serializers.Serializer):
 
 
 class VacationPeriodSerializer(serializers.ModelSerializer):
+    """Read-only. Vacations are created only by verifying a term letter."""
+
     class Meta:
         model = VacationPeriod
-        fields = ["id", "start_date", "end_date", "label"]
-        read_only_fields = ["id"]
+        fields = ["id", "term_letter", "start_date", "end_date", "label"]
+        read_only_fields = fields
 
-    def validate(self, attrs):
-        if attrs["end_date"] < attrs["start_date"]:
-            raise serializers.ValidationError({"end_date": "The end date cannot be before the start date."})
-        return attrs
+
+class TermLetterSerializer(serializers.ModelSerializer):
+    """The Owner/HR view of a letter. The file itself is fetched separately and every fetch is logged."""
+
+    employee = EmployeeBriefSerializer(source="visa.employee", read_only=True)
+    vacations = VacationPeriodSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = TermLetter
+        fields = [
+            "id", "visa", "employee", "institution", "original_filename", "content_type", "size_bytes",
+            "status", "covers_from", "covers_to", "vacations", "reviewed_by", "reviewed_at",
+            "review_note", "created_at",
+        ]
+        read_only_fields = fields
+
+
+class MyTermLetterSerializer(serializers.ModelSerializer):
+    """What a student sees about their own uploads."""
+
+    class Meta:
+        model = TermLetter
+        fields = [
+            "id", "institution", "original_filename", "status", "covers_from", "covers_to",
+            "review_note", "created_at",
+        ]
+        read_only_fields = fields
+
+
+class VacationInputSerializer(serializers.Serializer):
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+    label = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+
+
+class VerifyLetterSerializer(serializers.Serializer):
+    covers_from = serializers.DateField()
+    covers_to = serializers.DateField()
+    vacations = VacationInputSerializer(many=True, required=False, default=list)
+
+
+class RejectLetterSerializer(serializers.Serializer):
+    reason = serializers.CharField(max_length=500, allow_blank=True, default="")
 
 
 class RightToWorkCheckSerializer(serializers.ModelSerializer):

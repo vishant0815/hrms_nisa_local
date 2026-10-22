@@ -4,7 +4,11 @@ Data minimisation (UK GDPR): passport numbers and share codes are deliberately N
 A right-to-work check needs the outcome, the date, who did it and a reference to where the
 evidence is kept; the evidence itself stays in the employer's secure document store.
 """
+import os
+import uuid
+
 from django.conf import settings
+from django.core.files.storage import storages
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import F, Q
@@ -37,6 +41,11 @@ class VisaType(models.Model):
     requires_manual_decision = models.BooleanField(
         default=False,
         help_text="Conditions vary per person; HR must record whether this person may work.",
+    )
+    requires_term_letter = models.BooleanField(
+        default=False,
+        help_text="The person must supply a letter from their university confirming term dates "
+                  "(Student). Without a verified letter a warning is raised and the weekly cap always applies.",
     )
     notes = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
@@ -140,13 +149,71 @@ class EmployeeVisa(models.Model):
         return VisaStatus.VALID
 
 
+def private_storage():
+    """Where uploaded documents live. Not publicly served; see PRIVATE_MEDIA_ROOT in settings."""
+    return storages["private_documents"]
+
+
+def term_letter_path(instance, filename):
+    # The stored name is random and its extension comes from the checked file type, never
+    # from what the uploader called it.
+    extension = os.path.splitext(filename)[1].lower()
+    return f"term-letters/{instance.visa.employee_id}/{uuid.uuid4().hex}{extension}"
+
+
+class LetterStatus(models.TextChoices):
+    PENDING = "pending", "Waiting for HR"
+    VERIFIED = "verified", "Verified"
+    REJECTED = "rejected", "Rejected"
+
+
+class TermLetter(models.Model):
+    """A student's letter from their university confirming term and vacation dates.
+
+    The student uploads it; it counts for nothing until HR has read it and entered the dates.
+    """
+
+    visa = models.ForeignKey(EmployeeVisa, on_delete=models.PROTECT, related_name="term_letters")
+    file = models.FileField(upload_to=term_letter_path, storage=private_storage, max_length=200)
+    original_filename = models.CharField(max_length=100)
+    content_type = models.CharField(max_length=50)
+    size_bytes = models.PositiveIntegerField()
+    institution = models.CharField(max_length=150, blank=True)
+    status = models.CharField(max_length=10, choices=LetterStatus.choices, default=LetterStatus.PENDING)
+    covers_from = models.DateField(null=True, blank=True, help_text="Set by HR when verifying.")
+    covers_to = models.DateField(null=True, blank=True, help_text="Set by HR when verifying.")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.CharField(max_length=500, blank=True, help_text="Why it was rejected.")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(covers_from__isnull=True)
+                | Q(covers_to__isnull=True)
+                | Q(covers_to__gte=F("covers_from")),
+                name="term_letter_covers_to_not_before_from",
+            ),
+        ]
+
+
 class VacationPeriod(models.Model):
     """Official vacation dates for a student, when the weekly hours cap does not apply.
 
-    Entered by HR from the student's university calendar.
+    Only periods that come from a VERIFIED term letter lift the cap.
     """
 
     visa = models.ForeignKey(EmployeeVisa, on_delete=models.CASCADE, related_name="vacations")
+    term_letter = models.ForeignKey(
+        TermLetter, null=True, blank=True, on_delete=models.PROTECT, related_name="vacations"
+    )
     start_date = models.DateField()
     end_date = models.DateField()
     label = models.CharField(max_length=100, blank=True)

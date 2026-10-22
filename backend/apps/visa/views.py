@@ -1,8 +1,11 @@
 from django.db.models import Prefetch
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.exceptions import NotFound
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -11,17 +14,21 @@ from apps.accounts.permissions import IsManagerOrAbove, IsOwnerOrHR
 from apps.employees.models import EmployeeProfile
 from apps.employees.scoping import employees_visible_to
 
-from . import services
-from .models import EmployeeVisa, RightToWorkCheck, VisaType
+from . import letters, services
+from .models import EmployeeVisa, LetterStatus, RightToWorkCheck, TermLetter, VisaType
 from .rules import check_right_to_work
 from .serializers import (
     CanWorkQuerySerializer,
     EmployeeVisaCreateSerializer,
     EmployeeVisaSerializer,
     EmployeeVisaUpdateSerializer,
+    MyTermLetterSerializer,
+    RejectLetterSerializer,
     RevokeSerializer,
     RightToWorkCheckSerializer,
+    TermLetterSerializer,
     VacationPeriodSerializer,
+    VerifyLetterSerializer,
     VisaTypeSerializer,
 )
 
@@ -108,18 +115,134 @@ class VisaRevokeView(APIView):
 
 
 class VisaVacationsView(APIView):
+    """Vacation periods, read-only. They are created by verifying a student's term letter."""
+
     permission_classes = [IsOwnerOrHR]
 
     def get(self, request, pk):
         visa = get_visa(pk)
         return Response(VacationPeriodSerializer(visa.vacations.all(), many=True).data)
 
+
+class MyTermLettersView(APIView):
+    """A student's own letters: list them, or upload a new one (multipart: file, institution)."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    throttle_scope = "upload"
+
+    def get_throttles(self):
+        return super().get_throttles() if self.request.method == "POST" else []
+
+    def get_profile(self, request):
+        profile = EmployeeProfile.objects.filter(user=request.user).first()
+        if profile is None:
+            raise NotFound("You do not have an employee profile.")
+        return profile
+
+    def get(self, request):
+        profile = self.get_profile(request)
+        mine = TermLetter.objects.filter(visa__employee=profile)
+        return Response(MyTermLetterSerializer(mine, many=True).data)
+
+    def post(self, request):
+        profile = self.get_profile(request)
+        upload = request.FILES.get("file")
+        if upload is None:
+            return Response({"file": ["Choose a file to upload."]}, status=status.HTTP_400_BAD_REQUEST)
+        letter = letters.upload_letter(
+            employee=profile, user=request.user, upload=upload,
+            institution=str(request.data.get("institution", "")),
+        )
+        return Response(MyTermLetterSerializer(letter).data, status=status.HTTP_201_CREATED)
+
+
+class TermLetterQueueView(APIView):
+    """HR's list of letters. Defaults to the ones waiting to be checked."""
+
+    permission_classes = [IsOwnerOrHR]
+
+    def get(self, request):
+        wanted = request.query_params.get("status", LetterStatus.PENDING)
+        queryset = TermLetter.objects.select_related("visa__employee__user").prefetch_related("vacations")
+        if wanted != "all":
+            if wanted not in LetterStatus.values:
+                return Response({"status": "Use pending, verified, rejected or all."}, status=400)
+            queryset = queryset.filter(status=wanted)
+        return Response(TermLetterSerializer(queryset.order_by("created_at", "id"), many=True).data)
+
+
+class EmployeeTermLettersView(APIView):
+    permission_classes = [IsOwnerOrHR]
+
+    def get(self, request, employee_id):
+        employee = get_employee(employee_id)
+        queryset = (
+            TermLetter.objects.filter(visa__employee=employee)
+            .select_related("visa__employee__user")
+            .prefetch_related("vacations")
+        )
+        return Response(TermLetterSerializer(queryset, many=True).data)
+
+
+def get_letter(pk):
+    return get_object_or_404(
+        TermLetter.objects.select_related("visa__employee__user").prefetch_related("vacations"), pk=pk
+    )
+
+
+class TermLetterFileView(APIView):
+    """Download the uploaded file. Owner/HR only, and every download is logged."""
+
+    permission_classes = [IsOwnerOrHR]
+
+    def get(self, request, pk):
+        letter = get_letter(pk)
+        try:
+            handle = letter.file.open("rb")
+        except FileNotFoundError:
+            raise NotFound("The file is missing from storage.")
+        services.audit(request.user, "term_letter_downloaded", letter.visa.employee, letter.visa)
+        extension = letters.FILE_TYPES[letter.content_type][0]
+        response = FileResponse(
+            handle, as_attachment=True, filename=f"term-letter-{letter.pk}{extension}",
+            content_type=letter.content_type,
+        )
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
+class TermLetterVerifyView(APIView):
+    permission_classes = [IsOwnerOrHR]
+
     def post(self, request, pk):
-        visa = get_visa(pk)
-        serializer = VacationPeriodSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        vacation = services.add_vacation(visa=visa, by=request.user, **serializer.validated_data)
-        return Response(VacationPeriodSerializer(vacation).data, status=status.HTTP_201_CREATED)
+        letter = get_letter(pk)
+        body = VerifyLetterSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        letters.verify_letter(letter=letter, by=request.user, **body.validated_data)
+        return Response(TermLetterSerializer(get_letter(pk)).data)
+
+
+class TermLetterRejectView(APIView):
+    permission_classes = [IsOwnerOrHR]
+
+    def post(self, request, pk):
+        letter = get_letter(pk)
+        body = RejectLetterSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        letters.reject_letter(letter=letter, by=request.user, reason=body.validated_data["reason"])
+        return Response(TermLetterSerializer(get_letter(pk)).data)
+
+
+class MissingTermLettersView(APIView):
+    """Students with no verified term letter covering today: the people HR needs to chase."""
+
+    permission_classes = [IsOwnerOrHR]
+
+    def get(self, request):
+        visas = with_checks(letters.students_missing_letters())
+        return Response(EmployeeVisaSerializer(visas, many=True).data)
 
 
 class EmployeeChecksView(APIView):

@@ -12,7 +12,7 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import Optional
 
-from .models import EXPIRY_WARNING_DAYS, CheckState, EmployeeVisa
+from .models import EXPIRY_WARNING_DAYS, CheckState, EmployeeVisa, LetterStatus, TermLetter
 
 
 class Code:
@@ -37,6 +37,7 @@ class WorkDecision:
     reasons: list = field(default_factory=list)      # [(code, text)] why the answer is no
     warnings: list = field(default_factory=list)     # [text] allowed, but HR should know
     weekly_hours_limit: Optional[int] = None         # cap that applies on the date, if any
+    paperwork_needed: bool = False                   # e.g. a student with no verified term letter
 
     @property
     def codes(self) -> set:
@@ -49,10 +50,11 @@ class WorkDecision:
             "reasons": [{"code": code, "text": text} for code, text in self.reasons],
             "warnings": list(self.warnings),
             "weekly_hours_limit": self.weekly_hours_limit,
+            "paperwork_needed": self.paperwork_needed,
         }
 
     def for_manager(self) -> dict:
-        """Yes/no and the hours limit only. No visa type, dates or check details."""
+        """Yes/no, the hours limit and whether paperwork is outstanding. No visa type, dates or details."""
         if self.allowed:
             message = ""
         elif self.codes == {Code.HOURS_LIMIT}:
@@ -62,6 +64,7 @@ class WorkDecision:
         return {
             "allowed": self.allowed,
             "weekly_hours_limit": self.weekly_hours_limit,
+            "paperwork_needed": self.paperwork_needed,
             "message": message,
         }
 
@@ -128,8 +131,21 @@ def check_right_to_work(employee, on, week_hours: Optional[Decimal] = None) -> W
     elif state == CheckState.OVERDUE:
         reasons.append((Code.CHECK_OVERDUE, "A follow-up right-to-work check is overdue."))
 
+    paperwork_needed = False
+    if visa_type.requires_term_letter:
+        covered = TermLetter.objects.filter(
+            visa=visa, status=LetterStatus.VERIFIED, covers_from__lte=on, covers_to__gte=on
+        ).exists()
+        if not covered:
+            # Warn, don't block: the weekly cap still applies, so they cannot be over-worked.
+            paperwork_needed = True
+            warnings.append("No verified term-dates letter covers this date.")
+
     limit = visa.weekly_hours_cap_override or visa_type.max_weekly_hours
-    if limit is not None and visa.vacations.filter(start_date__lte=on, end_date__gte=on).exists():
+    on_vacation = visa.vacations.filter(
+        start_date__lte=on, end_date__gte=on, term_letter__status=LetterStatus.VERIFIED
+    ).exists()
+    if limit is not None and on_vacation:
         warnings.append("Official vacation: the weekly hours cap does not apply.")
         limit = None
     if limit is not None and week_hours is not None and Decimal(week_hours) > limit:
@@ -138,5 +154,6 @@ def check_right_to_work(employee, on, week_hours: Optional[Decimal] = None) -> W
         )
 
     return WorkDecision(
-        allowed=not reasons, reasons=reasons, warnings=warnings, weekly_hours_limit=limit
+        allowed=not reasons, reasons=reasons, warnings=warnings, weekly_hours_limit=limit,
+        paperwork_needed=paperwork_needed,
     )
