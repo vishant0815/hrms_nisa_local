@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "apps.stores",
     "apps.employees",
     "apps.visa",
+    "apps.rota",
 ]
 
 MIDDLEWARE = [

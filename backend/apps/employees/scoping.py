@@ -16,6 +16,16 @@ def _active_on(prefix: str, on):
     )
 
 
+def _current_or_upcoming(prefix: str, on):
+    """Q for approved assignments that have not ended by `on` (already started, or still to come).
+
+    Managers need to see staff arriving next week so they can plan the rota.
+    """
+    return Q(**{f"{prefix}status": AssignmentStatus.APPROVED}) & (
+        Q(**{f"{prefix}valid_to__isnull": True}) | Q(**{f"{prefix}valid_to__gte": on})
+    )
+
+
 def current_home_prefetch(on):
     """Prefetch each employee's current home assignment, avoiding one query per employee."""
     return Prefetch(
@@ -34,8 +44,11 @@ def employees_visible_to(user):
     if is_admin(user):
         visible = queryset
     elif user.role == Role.MANAGER:
-        # Their own profile, plus staff currently assigned (home or approved cover) to a store they run.
-        at_my_store = Q(assignments__store_id__in=managed_store_ids(user)) & _active_on("assignments__", today)
+        # Their own profile, plus staff assigned (home or approved cover) to a store they run,
+        # including approved assignments that start in the future.
+        at_my_store = Q(assignments__store_id__in=managed_store_ids(user)) & _current_or_upcoming(
+            "assignments__", today
+        )
         visible = queryset.filter(at_my_store | Q(user=user)).distinct()
     else:
         visible = queryset.filter(user=user)
