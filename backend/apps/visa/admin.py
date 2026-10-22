@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import EmployeeVisa, RightToWorkCheck, VacationPeriod, VisaAuditLog, VisaType
+from .models import EmployeeVisa, RightToWorkCheck, TermLetter, VacationPeriod, VisaAuditLog, VisaType
 
 
 @admin.register(VisaType)
@@ -32,6 +32,14 @@ class ReadOnlyAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(TermLetter)
+class TermLetterAdmin(ReadOnlyAdmin):
+    # Review letters through the API so verification, dates and the audit log stay in step.
+    list_display = ["visa", "status", "institution", "covers_from", "covers_to", "created_at"]
+    list_filter = ["status"]
+    exclude = ["file"]
 
 
 @admin.register(RightToWorkCheck)

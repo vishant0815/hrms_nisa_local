@@ -1,6 +1,9 @@
 """Django settings for the HRMS backend. Configuration comes from environment variables."""
+import atexit
 import os
+import shutil
 import sys
+import tempfile
 from datetime import timedelta
 from pathlib import Path
 
@@ -111,6 +114,23 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Private documents (term letters, later right-to-work evidence). They are never served from a
+# public URL: the only way to read one is an authenticated API call that checks the caller's role.
+# To move to S3/MinIO later, change the "private_documents" BACKEND and OPTIONS.
+PRIVATE_MEDIA_ROOT = Path(os.environ.get("PRIVATE_MEDIA_ROOT", BASE_DIR / "private_media"))
+if "test" in sys.argv:
+    PRIVATE_MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="hrms-test-documents-"))
+    atexit.register(shutil.rmtree, PRIVATE_MEDIA_ROOT, ignore_errors=True)
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    "private_documents": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {"location": str(PRIVATE_MEDIA_ROOT)},
+    },
+}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
@@ -122,7 +142,7 @@ REST_FRAMEWORK = {
     # Deny by default; every view must opt in to broader access.
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.ScopedRateThrottle",),
-    "DEFAULT_THROTTLE_RATES": {"login": "10/min"},
+    "DEFAULT_THROTTLE_RATES": {"login": "10/min", "upload": "20/hour"},
     # The frontend sends JSON, so tests do too.
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }

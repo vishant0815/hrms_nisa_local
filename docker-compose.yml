@@ -52,6 +52,7 @@ services:
     env_file: .env
     volumes:
       - ./backend:/app
+      - private_media:/data/private_media
     ports:
       - "8000:8000"
     depends_on:
@@ -65,3 +66,4 @@ services:
 volumes:
   postgres_data:
   kafka_data:
+  private_media:
