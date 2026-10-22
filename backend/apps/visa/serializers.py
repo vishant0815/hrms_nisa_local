@@ -103,7 +103,7 @@ class TermLetterSerializer(serializers.ModelSerializer):
         model = TermLetter
         fields = [
             "id", "visa", "employee", "institution", "original_filename", "content_type", "size_bytes",
-            "status", "covers_from", "covers_to", "vacations", "reviewed_by", "reviewed_at",
+            "status", "covers_from", "covers_to", "suggested", "vacations", "reviewed_by", "reviewed_at",
             "review_note", "created_at",
         ]
         read_only_fields = fields
@@ -154,3 +154,8 @@ class CanWorkQuerySerializer(serializers.Serializer):
     week_hours = serializers.DecimalField(
         required=False, max_digits=5, decimal_places=2, min_value=Decimal("0"), max_value=Decimal("168")
     )
+
+
+class AvailabilityQuerySerializer(serializers.Serializer):
+    start = serializers.DateField(required=False)
+    end = serializers.DateField(required=False)

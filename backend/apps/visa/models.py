@@ -190,6 +190,10 @@ class TermLetter(models.Model):
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
     review_note = models.CharField(max_length=500, blank=True, help_text="Why it was rejected.")
+    suggested = models.JSONField(
+        default=dict, blank=True,
+        help_text="Dates the system read from the file. Only a suggestion: HR confirms the real dates.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

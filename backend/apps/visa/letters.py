@@ -11,6 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from . import reading
 from .models import EmployeeVisa, LetterStatus, TermLetter, VacationPeriod
 from .services import audit
 
@@ -71,6 +72,7 @@ def upload_letter(*, employee, user, upload, institution=""):
         size_bytes=upload.size,
         institution=institution[:150],
         uploaded_by=user,
+        suggested=reading.suggestions_for(upload, content_type),
     )
     audit(user, "term_letter_uploaded", employee, visa)
     return letter

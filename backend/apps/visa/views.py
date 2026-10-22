@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db.models import Prefetch
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
@@ -18,6 +20,7 @@ from . import letters, services
 from .models import EmployeeVisa, LetterStatus, RightToWorkCheck, TermLetter, VisaType
 from .rules import check_right_to_work
 from .serializers import (
+    AvailabilityQuerySerializer,
     CanWorkQuerySerializer,
     EmployeeVisaCreateSerializer,
     EmployeeVisaSerializer,
@@ -299,3 +302,50 @@ class CanWorkView(APIView):
         else:
             body = decision.for_manager()
         return Response({"employee": employee.pk, "date": on, **body})
+
+
+class AvailabilityView(APIView):
+    """When can this person work full time, and when are their hours limited?
+
+    Built for managers: runs of days with the same answer, and nothing about why. It uses the
+    same rule as the rota, so the term dates HR confirmed are applied without anyone reading a letter.
+    """
+
+    permission_classes = [IsManagerOrAbove]
+    MAX_DAYS = 92
+
+    def get(self, request, employee_id):
+        employee = employees_visible_to(request.user).filter(pk=employee_id).first()
+        if employee is None:
+            raise NotFound()
+        query = AvailabilityQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        first = query.validated_data.get("start") or timezone.localdate()
+        last = query.validated_data.get("end") or first + timedelta(days=27)
+        if last < first:
+            return Response({"end": "The end date cannot be before the start."}, status=status.HTTP_400_BAD_REQUEST)
+        if (last - first).days + 1 > self.MAX_DAYS:
+            return Response({"end": f"Ask for at most {self.MAX_DAYS} days."}, status=status.HTTP_400_BAD_REQUEST)
+
+        periods = []
+        day = first
+        while day <= last:
+            body = check_right_to_work(employee, day, None).for_manager()
+            if not body["allowed"]:
+                mode, limit = "not_cleared", None
+            elif body["weekly_hours_limit"] is None:
+                mode, limit = "full_time", None
+            else:
+                mode, limit = "limited", body["weekly_hours_limit"]
+            key = (mode, limit, body["paperwork_needed"])
+            if periods and periods[-1]["_key"] == key:
+                periods[-1]["end"] = day
+            else:
+                periods.append({
+                    "_key": key, "start": day, "end": day, "mode": mode,
+                    "weekly_hours_limit": limit, "paperwork_needed": body["paperwork_needed"],
+                })
+            day += timedelta(days=1)
+        for period in periods:
+            del period["_key"]
+        return Response({"employee": employee.pk, "from": first, "to": last, "periods": periods})
