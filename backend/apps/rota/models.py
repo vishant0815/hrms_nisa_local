@@ -86,3 +86,57 @@ class Shift(models.Model):
 
     def __str__(self) -> str:
         return f"{self.rota_week.store} {self.date} {self.start_time:%H:%M}-{self.end_time:%H:%M}"
+
+
+class SwapStatus(models.TextChoices):
+    PENDING_COLLEAGUE = "pending_colleague", "Waiting for the colleague"
+    PENDING_MANAGER = "pending_manager", "Waiting for the manager"
+    APPROVED = "approved", "Approved"
+    DECLINED = "declined", "Declined by the colleague"
+    REJECTED = "rejected", "Rejected by the manager"
+    CANCELLED = "cancelled", "Cancelled by the requester"
+
+
+OPEN_SWAP_STATUSES = (SwapStatus.PENDING_COLLEAGUE, SwapStatus.PENDING_MANAGER)
+
+
+class ShiftSwap(models.Model):
+    """One employee hands a shift to a colleague, who may give one of their own back.
+
+    Nothing changes on the rota until a manager approves. Then both shifts change hands in one
+    step, after every rota rule has been checked again.
+    """
+
+    offered_shift = models.ForeignKey(Shift, on_delete=models.PROTECT, related_name="swaps_offered")
+    requested_shift = models.ForeignKey(
+        Shift, null=True, blank=True, on_delete=models.PROTECT, related_name="swaps_requested",
+        help_text="The colleague's shift given back in return. Empty means a plain hand-over.",
+    )
+    requester = models.ForeignKey("employees.EmployeeProfile", on_delete=models.PROTECT, related_name="swap_requests")
+    colleague = models.ForeignKey("employees.EmployeeProfile", on_delete=models.PROTECT, related_name="swap_invitations")
+    status = models.CharField(max_length=20, choices=SwapStatus.choices, default=SwapStatus.PENDING_COLLEAGUE)
+    note = models.CharField(max_length=300, blank=True)
+    decision_note = models.CharField(max_length=300, blank=True, help_text="The manager's reason, if rejected.")
+    colleague_responded_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["offered_shift"],
+                condition=models.Q(status__in=["pending_colleague", "pending_manager"]),
+                name="one_open_swap_per_offered_shift",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(requester=models.F("colleague")), name="swap_with_someone_else",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Swap {self.pk} ({self.status})"
