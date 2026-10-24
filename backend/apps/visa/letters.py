@@ -11,7 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from . import reading
+from . import alerts, reading
 from .models import EmployeeVisa, LetterStatus, TermLetter, VacationPeriod
 from .services import audit
 
@@ -75,6 +75,7 @@ def upload_letter(*, employee, user, upload, institution=""):
         suggested=reading.suggestions_for(upload, content_type),
     )
     audit(user, "term_letter_uploaded", employee, visa)
+    alerts.term_letter_uploaded(letter)
     return letter
 
 
@@ -109,6 +110,7 @@ def verify_letter(*, letter, by, covers_from, covers_to, vacations):
         [VacationPeriod(visa=visa, term_letter=letter, **vacation) for vacation in vacations]
     )
     audit(by, "term_letter_verified", visa.employee, visa)
+    alerts.term_letter_reviewed(letter)
     return letter
 
 
@@ -124,6 +126,7 @@ def reject_letter(*, letter, by, reason):
     letter.reviewed_at = timezone.now()
     letter.save()
     audit(by, "term_letter_rejected", letter.visa.employee, letter.visa)
+    alerts.term_letter_reviewed(letter)
     return letter
 
 

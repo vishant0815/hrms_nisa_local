@@ -28,6 +28,7 @@ from apps.employees.services import stores_for_employee_on
 from apps.rota.models import Shift, ShiftStatus, WeekStatus
 from apps.rota.services import lock_employee, shift_span
 
+from . import alerts
 from .geo import distance_m
 from .models import AttendanceEdit, AttendanceRecord, ReviewStatus, Source
 
@@ -158,12 +159,15 @@ def clock_in(*, employee, latitude=None, longitude=None, accuracy_m=None, device
         flags.append("shared_device")
     begins, _ = shift_span(shift.date, shift.start_time, shift.end_time)
     late = max(0, int((local_naive(now) - begins).total_seconds() // 60))
-    return AttendanceRecord.objects.create(
+    record = AttendanceRecord.objects.create(
         employee=employee, store=store, shift=shift, clock_in_at=now,
         in_latitude=latitude, in_longitude=longitude, in_accuracy_m=accuracy_m,
         in_distance_m=distance, in_device_id=device_id, late_minutes=late, flags=flags,
         review_status=ReviewStatus.PENDING if needs_review(flags) else ReviewStatus.NOT_REQUIRED,
     )
+    if record.review_status == ReviewStatus.PENDING:
+        alerts.review_needed(record, "in")
+    return record
 
 
 @transaction.atomic
@@ -197,9 +201,12 @@ def clock_out(*, employee, latitude=None, longitude=None, accuracy_m=None, devic
     record.out_latitude, record.out_longitude = latitude, longitude
     record.out_accuracy_m, record.out_distance_m, record.out_device_id = accuracy_m, distance, device_id
     record.flags = list(dict.fromkeys([*record.flags, *flags]))
-    if needs_review(record.flags) and record.review_status == ReviewStatus.NOT_REQUIRED:
+    newly_flagged = needs_review(record.flags) and record.review_status == ReviewStatus.NOT_REQUIRED
+    if newly_flagged:
         record.review_status = ReviewStatus.PENDING
     record.save()
+    if newly_flagged:  # managers were already told if the clock-in was flagged
+        alerts.review_needed(record, "out")
     return record
 
 

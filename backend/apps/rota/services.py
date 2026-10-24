@@ -27,6 +27,7 @@ from apps.employees.services import stores_for_employee_on
 from apps.stores.models import StoreHours
 from apps.visa.rules import Code, check_right_to_work, week_bounds
 
+from . import alerts
 from .models import RotaWeek, Shift, ShiftStatus, WeekStatus
 
 MIN_REST = timedelta(hours=11)
@@ -255,6 +256,7 @@ def publish_week(*, rota_week, by):
     rota_week.published_by = by
     rota_week.published_at = timezone.now()
     rota_week.save(update_fields=["status", "published_by", "published_at"])
+    alerts.rota_published(rota_week, today)
     return rota_week
 
 

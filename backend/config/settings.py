@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.visa",
     "apps.rota",
     "apps.attendance",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [
@@ -153,6 +154,20 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS", "7"))),
 }
 
-# Used by later modules (rota notifications, attendance events).
+# Email alerts. Emails are queued in the database, sent through Kafka by two small services
+# (relay_notifications and consume_notifications). NOTIFICATIONS_BUS=memory skips Kafka (tests, demos).
+NOTIFICATIONS_BUS = os.environ.get("NOTIFICATIONS_BUS", "kafka")
+NOTIFICATION_TOPIC = os.environ.get("NOTIFICATION_TOPIC", "hrms.notifications")
+NOTIFICATION_CONSUMER_GROUP = os.environ.get("NOTIFICATION_CONSUMER_GROUP", "hrms-notifications")
+SITE_URL = os.environ.get("SITE_URL", "http://localhost:3000")  # where the links in emails point
+
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "HRMS <no-reply@example.com>")
+
 KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
