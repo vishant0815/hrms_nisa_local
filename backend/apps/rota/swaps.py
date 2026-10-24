@@ -17,6 +17,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.employees.models import AssignmentStatus, EmployeeProfile, StoreAssignment
 
+from . import alerts
 from .models import OPEN_SWAP_STATUSES, Shift, ShiftStatus, ShiftSwap, SwapStatus, WeekStatus
 from .services import evaluate_assignment, lock_employee, problem, raise_blocks, shift_span
 
@@ -128,9 +129,11 @@ def request_swap(*, requester, offered_shift_id, colleague_id, note=""):
         fail("already_requested", "This shift is already part of a swap request.")
     if rule_problems(offered, None, requester, colleague):
         not_possible()
-    return ShiftSwap.objects.create(
+    swap = ShiftSwap.objects.create(
         offered_shift=offered, requester=requester, colleague=colleague, note=note[:300],
     )
+    alerts.swap_requested(swap)
+    return swap
 
 
 @transaction.atomic
@@ -160,6 +163,7 @@ def colleague_accepts(*, swap, employee, in_return_shift_id=None):
     swap.status = SwapStatus.PENDING_MANAGER
     swap.colleague_responded_at = timezone.now()
     swap.save()
+    alerts.swap_accepted(swap)
     return swap
 
 
@@ -171,6 +175,7 @@ def colleague_declines(*, swap, employee):
     swap.status = SwapStatus.DECLINED
     swap.colleague_responded_at = timezone.now()
     swap.save()
+    alerts.swap_declined(swap)
     return swap
 
 
@@ -181,6 +186,7 @@ def requester_cancels(*, swap, employee):
         fail("swap_not_open", "This request can no longer be cancelled.")
     swap.status = SwapStatus.CANCELLED
     swap.save()
+    alerts.swap_cancelled(swap)
     return swap
 
 
@@ -210,6 +216,7 @@ def manager_approves(*, swap, by):
     swap.reviewed_by = by
     swap.reviewed_at = timezone.now()
     swap.save()
+    alerts.swap_approved(swap)
     return swap
 
 
@@ -223,4 +230,5 @@ def manager_rejects(*, swap, by, reason=""):
     swap.reviewed_by = by
     swap.reviewed_at = timezone.now()
     swap.save()
+    alerts.swap_rejected(swap)
     return swap

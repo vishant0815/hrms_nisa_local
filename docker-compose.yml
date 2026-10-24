@@ -78,6 +78,31 @@ services:
       backend:
         condition: service_started
 
+  # Email alerts: the relay puts queued emails on Kafka, the consumer sends them.
+  notification-relay:
+    build: ./backend
+    command: python manage.py relay_notifications
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  notification-consumer:
+    build: ./backend
+    command: python manage.py consume_notifications
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
 volumes:
   postgres_data:
   kafka_data:
