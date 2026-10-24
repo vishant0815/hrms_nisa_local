@@ -63,6 +63,21 @@ services:
       kafka:
         condition: service_started
 
+  # Clock-in / clock-out. Route /api/clock/* here and the rest of /api/ to the backend service.
+  attendance-api:
+    build: ./backend
+    command: uvicorn attendance_api.main:app --host 0.0.0.0 --port 8001
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
 volumes:
   postgres_data:
   kafka_data:
