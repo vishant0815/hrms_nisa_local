@@ -144,6 +144,60 @@ def visa_digest(ctx, user):
     return "Immigration paperwork needs attention", compose(user, lines[:-1], "/hr/visas", "Open the visa pages")
 
 
+# --- Leave ----------------------------------------------------------------------------------
+
+LEAVE_WORDS = {"annual": "annual leave", "unpaid": "unpaid leave", "sick": "sick leave", "other": "leave"}
+HALF_WORDS = {"am": " (morning only)", "pm": " (afternoon only)"}
+
+
+def leave_span(ctx):
+    if ctx["start"] == ctx["end"]:
+        return day(ctx["start"]) + HALF_WORDS.get(ctx.get("half_day", ""), "")
+    return f"{day(ctx['start'])} to {day(ctx['end'])}"
+
+
+def leave_requested(ctx, user):
+    lines = [f"{ctx['employee']} has asked for {LEAVE_WORDS[ctx['kind']]}:", f"  {leave_span(ctx)} ({ctx['days']} day(s))"]
+    if ctx.get("note"):
+        lines.append(f"  Note: {ctx['note']}")
+    lines += ["", "Approve or reject it from the leave page."]
+    return "A leave request needs a decision", compose(user, lines, "/leave", "Decide on the request")
+
+
+def leave_decided(ctx, user):
+    what = f"Your request for {LEAVE_WORDS[ctx['kind']]}"
+    if ctx["status"] == "approved":
+        lines = [f"{what} has been approved:", f"  {leave_span(ctx)}"]
+        if ctx.get("days_charged") is not None:
+            lines.append(f"  Taken off your annual leave: {ctx['days_charged']} day(s)")
+        return "Your leave was approved", compose(user, lines, "/leave", "See your leave")
+    lines = [f"{what} was not approved:", f"  {leave_span(ctx)}"]
+    if ctx.get("reason"):
+        lines += ["", f"Reason from the manager: {ctx['reason']}"]
+    return "Your leave request was not approved", compose(user, lines, "/leave", "See your leave")
+
+
+def leave_cancelled_by_employee(ctx, user):
+    lines = [f"{ctx['employee']} has cancelled approved {LEAVE_WORDS[ctx['kind']]}:", f"  {leave_span(ctx)}", "",
+             "They are available to work those days again."]
+    return "Approved leave was cancelled", compose(user, lines, "/leave", "See the leave page")
+
+
+def leave_cancelled_by_manager(ctx, user):
+    lines = [f"Your {LEAVE_WORDS[ctx['kind']]} was cancelled:", f"  {leave_span(ctx)}"]
+    if ctx.get("reason"):
+        lines += ["", f"Reason: {ctx['reason']}"]
+    return "Your leave was cancelled", compose(user, lines, "/leave", "See your leave")
+
+
+def sick_reported(ctx, user):
+    lines = [f"{ctx['employee']} has reported sick:", f"  {leave_span(ctx)}"]
+    if ctx.get("shifts"):
+        lines += ["", "They are on the rota for these shifts, which may need cover:",
+                  *[f"  - {shift_line(s)}" for s in ctx["shifts"]]]
+    return "An absence was reported", compose(user, lines, "/rota", "Open the rota")
+
+
 RENDERERS = {
     "rota_published": rota_published,
     "swap_requested": swap_requested,
@@ -158,4 +212,9 @@ RENDERERS = {
     "term_letter_verified": term_letter_verified,
     "term_letter_rejected": term_letter_rejected,
     "visa_digest": visa_digest,
+    "leave_requested": leave_requested,
+    "leave_decided": leave_decided,
+    "leave_cancelled_by_employee": leave_cancelled_by_employee,
+    "leave_cancelled_by_manager": leave_cancelled_by_manager,
+    "sick_reported": sick_reported,
 }

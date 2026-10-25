@@ -3,6 +3,7 @@
 BLOCKS (the shift is refused):
   - the person is not employed on that date
   - the person is not assigned to work at this store on that date (home store or approved cover)
+  - the person is on approved leave that day (whatever the kind: the rota never shows why)
   - the person is not cleared to work, or the week would exceed their visa hours cap
   - the shift overlaps another of their shifts, at any store
   - the shift itself is malformed, in the past, or longer than 13 hours
@@ -11,6 +12,7 @@ WARNINGS (the shift is saved, the manager is told):
   - less than 11 hours' rest since or before another shift
   - more than 48 hours planned in the week
   - outside the store's opening hours, or on a day it is closed
+  - the person has an approved half day of leave that day
 
 Messages shown to managers never reveal immigration details: they only say "not cleared" or
 quote the weekly hours limit. HR can see the reason on the visa pages.
@@ -24,6 +26,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.employees.models import EmployeeProfile
 from apps.employees.services import stores_for_employee_on
+from apps.leave.models import LeaveRequest, LeaveStatus
 from apps.stores.models import StoreHours
 from apps.visa.rules import Code, check_right_to_work, week_bounds
 
@@ -119,6 +122,14 @@ def evaluate_assignment(*, store, employee, day, start, end, break_minutes, excl
         blocks.append(problem(
             "not_assigned_to_store", "This person is not assigned to work at this store on that date.",
         ))
+
+    leave = LeaveRequest.objects.filter(
+        employee=employee, status=LeaveStatus.APPROVED, start_date__lte=day, end_date__gte=day,
+    ).first()
+    if leave is not None and leave.half_day:
+        warnings.append(problem("half_day_leave", "This person has a half day of approved leave that day."))
+    elif leave is not None:
+        blocks.append(problem("on_leave", "This person is on approved leave that day."))
 
     # Everything else they are rostered for in the surrounding days, at ANY store, drafts included
     # (a draft may be published, so it counts).

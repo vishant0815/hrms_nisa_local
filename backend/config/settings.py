@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "apps.rota",
     "apps.attendance",
     "apps.notifications",
+    "apps.leave",
 ]
 
 MIDDLEWARE = [
@@ -153,6 +154,11 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.environ.get("JWT_ACCESS_MINUTES", "15"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS", "7"))),
 }
+
+# Leave. The leave year starts on the 1st of this month; the default allowance is for a full year
+# (28 days = the UK statutory 5.6 weeks for someone working five days a week).
+LEAVE_YEAR_START_MONTH = int(os.environ.get("LEAVE_YEAR_START_MONTH", "1"))
+DEFAULT_ANNUAL_LEAVE_DAYS = int(os.environ.get("DEFAULT_ANNUAL_LEAVE_DAYS", "28"))
 
 # Email alerts. Emails are queued in the database, sent through Kafka by two small services
 # (relay_notifications and consume_notifications). NOTIFICATIONS_BUS=memory skips Kafka (tests, demos).
