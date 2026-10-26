@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "apps.fingerprint",
     "apps.notifications",
     "apps.leave",
+    "apps.payroll",
 ]
 
 MIDDLEWARE = [

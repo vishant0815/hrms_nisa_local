@@ -13,4 +13,5 @@ urlpatterns = [
     path("api/", include("apps.fingerprint.urls")),
     path("api/", include("apps.notifications.urls")),
     path("api/", include("apps.leave.urls")),
+    path("api/", include("apps.payroll.urls")),
 ]
