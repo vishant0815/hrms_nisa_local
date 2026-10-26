@@ -1,5 +1,5 @@
 from django.http import HttpResponse
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -46,7 +46,6 @@ class PayslipLogoView(APIView):
     def post(self, request):
         upload = request.FILES.get("logo")
         if upload is None:
-            from rest_framework.exceptions import ValidationError
             raise ValidationError({"logo": "Attach the logo file in a field called 'logo'."})
         template, _ = services.set_logo(request.user, upload.read())
         return Response(PayslipTemplateSerializer(template).data, status=201)
@@ -204,3 +203,66 @@ def my_payslips(request):
     return Payslip.objects.filter(
         employee=profile, pay_run__status__in=[RunStatus.APPROVED, RunStatus.SENT]
     ).select_related("employee__user").order_by("-pay_run__period_start")
+
+
+# --- PDFs and the bank file -----------------------------------------------------------------------
+
+import csv
+from io import StringIO
+
+from django.http import FileResponse
+
+
+def pdf_response(slip):
+    if not slip.pdf:
+        raise NotFound("This payslip has no PDF yet.")
+    try:
+        handle = slip.pdf.open("rb")
+    except FileNotFoundError:
+        raise NotFound("The PDF is missing from storage.")
+    response = FileResponse(handle, as_attachment=False, filename=f"payslip-{slip.number}.pdf", content_type="application/pdf")
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+class PayslipPdfView(APIView):
+    permission_classes = [IsOwnerOrHR]
+
+    def get(self, request, pk):
+        return pdf_response(get_object_or_404(Payslip, pk=pk))
+
+
+class MyPayslipPdfView(APIView):
+    def get(self, request, pk):
+        return pdf_response(get_object_or_404(my_payslips(request), pk=pk))
+
+
+def spreadsheet_safe(value):
+    """A cell that starts with = + - @ can be run as a formula by Excel, so it is defanged."""
+    value = str(value)
+    return "'" + value if value[:1] in "=+-@\t\r" else value
+
+
+class PayRunBankFileView(APIView):
+    """The payments to upload to the bank. Nothing here moves money."""
+
+    permission_classes = [IsOwnerOrHR]
+
+    def get(self, request, pk):
+        run = get_object_or_404(PayRun, pk=pk)
+        if run.status == RunStatus.DRAFT:
+            raise ValidationError({"status": "Approve the pay run before making the bank file."})
+        rows, missing = services.bank_rows(run)
+        if missing:
+            raise ValidationError({"bank_details": f"These people have no bank details yet: {', '.join(missing)}."})
+        out = StringIO()
+        writer = csv.writer(out)
+        writer.writerow(["Name", "Sort code", "Account number", "Amount", "Reference"])
+        for row in rows:
+            writer.writerow([spreadsheet_safe(row["name"]), row["sort_code"], row["account_number"], row["amount"], row["reference"]])
+        response = HttpResponse(out.getvalue(), content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="bank-payments-{run.pay_date.isoformat()}.csv"'
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response

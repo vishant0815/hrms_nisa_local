@@ -2,6 +2,8 @@ import re
 from datetime import timedelta
 from io import BytesIO
 
+from decimal import Decimal
+
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -11,7 +13,7 @@ from rest_framework.exceptions import ValidationError
 from apps.attendance.models import AttendanceRecord
 from apps.employees.models import EmployeeProfile
 
-from . import calc, crypto, rules
+from . import calc, crypto, pdf, rules
 from .models import HoursApproval, PayDetails, PayRate, PayRun, Payslip, PayslipTemplate, RunStatus
 
 
@@ -247,7 +249,45 @@ def approve_run(user, run, template):
     run.approved_by, run.approved_at = user, timezone.now()
     run.template_snapshot = snapshot_template(template)
     run.save()
+    make_pdfs(run, template)
     return run
+
+
+def year_to_date(slip):
+    """Totals for this person from the start of the tax year up to and including this payslip."""
+    run = slip.pay_run
+    earlier = Payslip.objects.filter(
+        employee=slip.employee, pay_run__status__in=[RunStatus.APPROVED, RunStatus.SENT],
+        pay_run__pay_date__gte=calc.tax_year_start(run.pay_date), pay_run__pay_date__lte=run.pay_date,
+    )
+    totals = {key: Decimal("0") for key in ("gross_pay", "income_tax", "national_insurance", "pension", "student_loan", "other_deductions")}
+    for row in earlier:
+        for key in totals:
+            totals[key] += getattr(row, key)
+    totals["total_deductions"] = sum(totals[k] for k in totals if k != "gross_pay")
+    totals["net_pay"] = totals["gross_pay"] - totals["total_deductions"]
+    totals["tax_week"] = calc.tax_week(run.pay_date)
+    totals["tax_year"] = calc.tax_year_label(run.pay_date)
+    return totals
+
+
+def masked_details(employee):
+    from .serializers import mask_details
+
+    return mask_details(PayDetails.objects.filter(employee=employee).first())
+
+
+def make_pdfs(run, template):
+    logo = None
+    if template.logo:
+        try:
+            with template.logo.open("rb") as handle:
+                logo = handle.read()
+        except FileNotFoundError:
+            logo = None
+    for slip in run.payslips.select_related("employee__user", "store", "pay_run"):
+        data = pdf.render(slip, run.template_snapshot, masked_details(slip.employee), year_to_date(slip), logo)
+        slip.pdf.save(f"{slip.number}-{slip.pk}.pdf", ContentFile(data), save=True)
 
 
 def snapshot_template(template):
@@ -258,3 +298,24 @@ def snapshot_template(template):
         "footer_note": template.footer_note, "accent_colour": template.accent_colour,
         "show_bank_line": template.show_bank_line,
     }
+
+
+def bank_rows(run):
+    """(payments, people missing bank details) for everyone with money to receive."""
+    rows, missing = [], []
+    reference = f"WAGES {run.pay_date:%d%b}".upper()
+    for slip in run.payslips.select_related("employee__user"):
+        if slip.net_pay <= 0:
+            continue
+        details = PayDetails.objects.filter(employee=slip.employee).first()
+        sort_code = crypto.decrypt(details.sort_code_encrypted) if details else ""
+        account = crypto.decrypt(details.account_number_encrypted) if details else ""
+        if not (sort_code and account):
+            missing.append(slip.employee.employee_number)
+            continue
+        name = (details.account_name or slip.employee.user.get_full_name() or slip.employee.employee_number)[:18]
+        rows.append({
+            "name": name, "sort_code": f"{sort_code[:2]}-{sort_code[2:4]}-{sort_code[4:]}",
+            "account_number": account, "amount": f"{slip.net_pay:.2f}", "reference": reference,
+        })
+    return rows, missing

@@ -29,12 +29,19 @@ def pounds(value) -> Decimal:
     return Decimal(value).quantize(PENNY, rounding=ROUND_HALF_UP)
 
 
+def tax_year_start(on):
+    start = on.replace(month=4, day=6)
+    return start.replace(year=start.year - 1) if on < start else start
+
+
+def tax_year_label(on):
+    start = tax_year_start(on)
+    return f"{start.year}/{(start.year + 1) % 100:02d}"
+
+
 def tax_week(on):
     """UK tax week: week 1 starts on 6 April."""
-    start = on.replace(month=4, day=6)
-    if on < start:
-        start = start.replace(year=start.year - 1)
-    return (on - start).days // 7 + 1
+    return (on - tax_year_start(on)).days // 7 + 1
 
 
 def start_of_day(day):
