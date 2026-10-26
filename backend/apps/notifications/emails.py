@@ -198,7 +198,38 @@ def sick_reported(ctx, user):
     return "An absence was reported", compose(user, lines, "/rota", "Open the rota")
 
 
+# --- Payroll --------------------------------------------------------------------------------
+
+def pay_week(ctx):
+    return f"{day(ctx['period_start'])} to {day(ctx['period_end'])}"
+
+
+def payslip_ready(ctx, user):
+    lines = [f"Your payslip for {pay_week(ctx)} is ready.", "",
+             f"  Pay date: {day(ctx['pay_date'])}", f"  Hours paid: {ctx['hours']}", f"  Net pay: £{ctx['net_pay']}", "",
+             "Sign in to see the full payslip and download the PDF. It is not attached to this email, to keep your pay details private."]
+    return "Your payslip is ready", compose(user, lines, "/payslips", "See your payslip")
+
+
+def payroll_draft_ready(ctx, user):
+    lines = [f"The draft pay run for {pay_week(ctx)} is ready to check.", "",
+             f"  Payslips: {ctx['payslips']}", f"  Gross pay: £{ctx['gross']}", f"  Pay date: {day(ctx['pay_date'])}"]
+    if ctx["held"]:
+        lines.append(f"  Shifts held back, not paid yet: {ctx['held']}")
+    lines += ["", "Enter and confirm each person's tax, National Insurance and pension, then approve the run so the payslips go out on the pay date."]
+    return "Pay run ready to check", compose(user, lines, f"/payroll/{ctx['run_id']}", "Open the pay run")
+
+
+def payroll_not_approved(ctx, user):
+    lines = [f"The pay run for {pay_week(ctx)} has not been approved, so no payslips were sent.",
+             f"The pay date was {day(ctx['pay_date'])}. Approve it and the payslips will go out."]
+    return "Payslips not sent: pay run not approved", compose(user, lines, f"/payroll/{ctx['run_id']}", "Open the pay run")
+
+
 RENDERERS = {
+    "payslip_ready": payslip_ready,
+    "payroll_draft_ready": payroll_draft_ready,
+    "payroll_not_approved": payroll_not_approved,
     "rota_published": rota_published,
     "swap_requested": swap_requested,
     "swap_accepted_requester": swap_accepted_requester,

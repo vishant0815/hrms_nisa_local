@@ -11,6 +11,7 @@ A web-based HR management system for a group of 8 off-licence shops under one ow
 - **Rota**: store managers build their own shop's rota; employees see only their own shifts; the owner sees all 8 shops; shift swaps need manager approval
 - **Attendance**: clock-in/out with location, device and IP checks; out-of-location clock-ins are flagged for manager review; manual edits are audited
 - **Fingerprint clocking and breaks**: a fingerprint device at each shop for clock-in/out and breaks (30 minutes over 6 hours, 60 over 12; time beyond the allowance is unpaid), with break reports for managers; see `docs/fingerprint-devices.md`
+- **Payroll and payslips**: weekly pay worked out from the attendance records (app and fingerprint) and the hourly rate, checked and approved by Owner/HR, a PDF payslip from an editable template, a bank payment CSV, and a Thursday email to each employee; tax figures come from your accountant; see `docs/payroll.md`
 - **Leave**: apply and approve, linked to the rota
 - **Email notifications**: rota changes, swaps, cover requests, visa expiry and flagged attendance
 
