@@ -10,6 +10,7 @@ urlpatterns = [
     path("api/", include("apps.visa.urls")),
     path("api/", include("apps.rota.urls")),
     path("api/", include("apps.attendance.urls")),
+    path("api/", include("apps.fingerprint.urls")),
     path("api/", include("apps.notifications.urls")),
     path("api/", include("apps.leave.urls")),
 ]

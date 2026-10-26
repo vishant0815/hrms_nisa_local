@@ -11,7 +11,8 @@ Route /api/clock/* to this service and everything else under /api/ to Django (se
 The time of a clock event is always the server's. Anything a phone says about time is ignored.
 """
 import os
-from typing import Optional
+from datetime import datetime
+from typing import Literal, Optional
 
 import django
 
@@ -19,10 +20,10 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
 from django.db import close_old_connections  # noqa: E402
-from fastapi import Depends, FastAPI, Request  # noqa: E402
+from fastapi import Depends, FastAPI, Header, Request  # noqa: E402
 from fastapi.responses import JSONResponse  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
-from pydantic import BaseModel, Field, model_validator  # noqa: E402
+from pydantic import BaseModel, Field, field_validator, model_validator  # noqa: E402
 from rest_framework_simplejwt.exceptions import TokenError  # noqa: E402
 from rest_framework_simplejwt.tokens import AccessToken  # noqa: E402
 
@@ -30,6 +31,7 @@ from apps.accounts.models import User  # noqa: E402
 from apps.attendance import services  # noqa: E402
 from apps.attendance.models import ReviewStatus  # noqa: E402
 from apps.employees.models import EmployeeProfile  # noqa: E402
+from apps.fingerprint import services as fingerprint  # noqa: E402
 
 app = FastAPI(title="HRMS clock service", docs_url=None, redoc_url=None, openapi_url=None)
 bearer = HTTPBearer(auto_error=False)
@@ -129,3 +131,80 @@ def clock_status(employee: EmployeeProfile = Depends(current_employee)):
     if record is None:
         return {"clocked_in": False}
     return {"clocked_in": True, "since": record.clock_in_at, "store": {"id": record.store_id, "name": record.store.name}}
+
+
+# --- Fingerprint devices ----------------------------------------------------------------------
+# A device is not a person: it signs in with its serial number (X-Device-Serial) and its secret
+# (Authorization: Bearer ...), both set up by HR. The time a punch is recorded at is decided by
+# apps.fingerprint.services (our clock, unless the device sent it late).
+
+def current_device(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    x_device_serial: str = Header(default="", max_length=64),
+):
+    close_old_connections()
+    try:
+        device = fingerprint.authenticate(x_device_serial, credentials.credentials if credentials else "")
+        if device is None:
+            raise Problem(401, "device_not_recognised", "This device is not recognised.")
+        return device
+    finally:
+        close_old_connections()
+
+
+class DevicePunch(BaseModel):
+    user_id: int = Field(ge=0, le=2_000_000_000)
+    kind: Literal["in", "out", "break_start", "break_end"]
+    time: datetime
+
+    @field_validator("time")
+    @classmethod
+    def must_have_a_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError("Send the time with its timezone, for example 2026-11-02T09:01:00+00:00.")
+        return value
+
+
+class DevicePunchBatch(BaseModel):
+    punches: list[DevicePunch] = Field(min_length=1, max_length=100)
+
+
+class DeviceHeartbeat(BaseModel):
+    time: datetime
+
+    @field_validator("time")
+    @classmethod
+    def must_have_a_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError("Send the time with its timezone.")
+        return value
+
+
+def punch_result(punch):
+    return {"id": punch.pk, "outcome": punch.outcome, "reason": punch.reason}
+
+
+@app.post("/clock/device/punch")
+def device_punch(body: DevicePunch, device=Depends(current_device)):
+    close_old_connections()
+    punch = fingerprint.process_punch(device=device, user_id=body.user_id, kind=body.kind, device_time=body.time)
+    return punch_result(punch)
+
+
+@app.post("/clock/device/punches")
+def device_punches(body: DevicePunchBatch, device=Depends(current_device)):
+    """Punches a device held while it was offline. Handled oldest first."""
+    close_old_connections()
+    results = []
+    for item in sorted(body.punches, key=lambda p: p.time):
+        punch = fingerprint.process_punch(device=device, user_id=item.user_id, kind=item.kind, device_time=item.time)
+        results.append(punch_result(punch))
+    return {"results": results}
+
+
+@app.post("/clock/device/heartbeat")
+def device_heartbeat(body: DeviceHeartbeat, device=Depends(current_device)):
+    """Lets managers see the device is online and whether its clock is right."""
+    close_old_connections()
+    fingerprint.note_contact(device, body.time, fingerprint.attendance.current_time())
+    return {"status": "ok"}
