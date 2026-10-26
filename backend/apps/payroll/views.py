@@ -69,6 +69,7 @@ from .serializers import (
     PayRunSerializer,
     PayslipSerializer,
     RateSerializer,
+    SickPayInput,
     mask_details,
 )
 
@@ -166,6 +167,19 @@ class PayslipDeductionsView(APIView):
         data = dict(serializer.validated_data)
         confirmed = data.pop("confirmed", None)
         payslip = services.set_deductions(request.user, payslip, data, confirmed)
+        return Response(PayslipSerializer(payslip).data)
+
+
+class PayslipSickPayView(APIView):
+    """Statutory sick pay as worked out by the accountant, for someone who was off sick this week."""
+
+    permission_classes = [IsOwnerOrHR]
+
+    def patch(self, request, pk):
+        payslip = get_object_or_404(Payslip, pk=pk)
+        serializer = SickPayInput(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payslip = services.set_sick_pay(request.user, payslip, serializer.validated_data["sick_pay"])
         return Response(PayslipSerializer(payslip).data)
 
 

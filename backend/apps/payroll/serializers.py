@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from . import rules
@@ -45,6 +47,8 @@ class PayDetailsInput(serializers.Serializer):
     account_name = serializers.CharField(max_length=60, required=False, allow_blank=True)
     sort_code = serializers.CharField(max_length=12, required=False, allow_blank=True)
     account_number = serializers.CharField(max_length=14, required=False, allow_blank=True)
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    typical_day_hours = serializers.DecimalField(max_digits=4, decimal_places=2, required=False, allow_null=True)
 
 
 def mask_details(details):
@@ -52,6 +56,7 @@ def mask_details(details):
     sort_code = crypto.decrypt(details.sort_code_encrypted) if details else ""
     account = crypto.decrypt(details.account_number_encrypted) if details else ""
     ni = details.ni_number if details else ""
+    born = crypto.decrypt(details.date_of_birth_encrypted) if details else ""
     return {
         "ni_number": f"{ni[:2]}******{ni[-1:]}" if ni else "",
         "tax_code": details.tax_code if details else "",
@@ -59,6 +64,9 @@ def mask_details(details):
         "sort_code": f"**-**-{sort_code[-2:]}" if sort_code else "",
         "account_number": f"****{account[-4:]}" if account else "",
         "has_bank_details": bool(sort_code and account),
+        "date_of_birth": f"**/**/{born[:4]}" if born else "",
+        "has_date_of_birth": bool(born),
+        "typical_day_hours": f"{Decimal(details.typical_day_minutes) / 60:.2f}" if details and details.typical_day_minutes else None,
     }
 
 
@@ -72,7 +80,7 @@ class PayslipSerializer(serializers.ModelSerializer):
         model = Payslip
         fields = [
             "id", "number", "employee", "employee_number", "employee_name", "store", "paid_minutes",
-            "unpaid_break_minutes", "gross_pay", "earnings", "days", "held", "income_tax", "national_insurance",
+            "unpaid_break_minutes", "gross_pay", "earnings", "days", "held", "sick_dates", "sick_pay", "income_tax", "national_insurance",
             "pension", "student_loan", "other_deductions", "total_deductions", "net_pay", "deductions_confirmed",
             "emailed_at",
         ]
@@ -108,3 +116,7 @@ class PayRunSerializer(serializers.ModelSerializer):
 class CreateRunInput(serializers.Serializer):
     period_start = serializers.DateField()
     pay_date = serializers.DateField(required=False)
+
+
+class SickPayInput(serializers.Serializer):
+    sick_pay = serializers.DecimalField(max_digits=9, decimal_places=2)

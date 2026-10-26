@@ -100,6 +100,23 @@ def set_pay_details(user, employee, data: dict):
         if value and not TAX_CODE.match(value):
             fail("tax_code", "That is not a valid tax code (for example 1257L).")
         details.tax_code = value
+    if "date_of_birth" in data:
+        born = data["date_of_birth"]
+        if born is None:
+            details.date_of_birth_encrypted = ""
+        else:
+            today = timezone.localdate()
+            if born >= today or born.year < today.year - 100:
+                fail("date_of_birth", "That is not a sensible date of birth.")
+            details.date_of_birth_encrypted = crypto.encrypt(born.isoformat())
+    if "typical_day_hours" in data:
+        hours = data["typical_day_hours"]
+        if hours is None:
+            details.typical_day_minutes = None
+        else:
+            if not Decimal("0.5") <= hours <= 16:
+                fail("typical_day_hours", "A typical day is between half an hour and 16 hours.")
+            details.typical_day_minutes = int((hours * 60).quantize(Decimal("1")))
     if "account_name" in data:
         details.account_name = data["account_name"].strip()
     if "sort_code" in data:
@@ -165,35 +182,50 @@ def payslip_number(run, employee):
 
 @transaction.atomic
 def fill_run(run, now=None):
-    """(Re)build every payslip of a draft from the attendance records."""
+    """(Re)build every payslip of a draft from the attendance records and approved leave."""
+    from apps.leave.models import LeaveKind, LeaveRequest, LeaveStatus
+
     now = now or timezone.now()
     if run.status != RunStatus.DRAFT:
         fail("status", "Only a draft can be rebuilt.")
     first = calc.first_run_start()
     since = min(first, run.period_start) if first else run.period_start
     paid = paid_record_ids(exclude_run=run)
+    paid_leave = calc.paid_leave_dates(exclude_run=run)
     existing = {p.employee_id: p for p in run.payslips.all()}
     employee_ids = set(
         AttendanceRecord.objects.filter(
             clock_in_at__lt=calc.start_of_day(run.period_end + timedelta(days=1)),
             clock_in_at__gte=calc.start_of_day(since),
         ).exclude(pk__in=paid).values_list("employee_id", flat=True)
+    ) | set(
+        LeaveRequest.objects.filter(
+            status=LeaveStatus.APPROVED, kind__in=[LeaveKind.ANNUAL, LeaveKind.SICK],
+            start_date__lte=run.period_end, end_date__gte=since,
+        ).values_list("employee_id", flat=True)
     )
     for employee in EmployeeProfile.objects.filter(pk__in=employee_ids).select_related("user"):
-        data = calc.build_payslip_data(employee, run.period_end, paid, now, since)
+        details = PayDetails.objects.filter(employee=employee).first()
+        data = calc.build_payslip_data(employee, run, paid, paid_leave, now, since, details)
         old = existing.pop(employee.pk, None)
         if data is None:
             if old:
                 old.delete()
             continue
+        sick_pay = old.sick_pay if old and data["sick_dates"] else Decimal("0")
+        earnings = list(data["earnings"])
+        if sick_pay:
+            earnings.append({"label": "Statutory sick pay", "minutes": 0, "rate": "", "amount": str(sick_pay)})
+        gross = data["gross_pay"] + sick_pay
         fields = {
             "number": payslip_number(run, employee), "store_id": data["store_id"],
             "paid_minutes": data["paid_minutes"], "unpaid_break_minutes": data["unpaid_break_minutes"],
-            "gross_pay": data["gross_pay"], "days": data["days"], "held": data["held"],
-            "earnings": data["earnings"], "record_ids": data["record_ids"],
+            "gross_pay": gross, "days": data["days"], "held": data["held"], "earnings": earnings,
+            "record_ids": data["record_ids"], "leave_dates": data["leave_dates"], "sick_dates": data["sick_dates"],
+            "sick_pay": sick_pay,
         }
         if old:
-            if old.gross_pay != data["gross_pay"]:
+            if old.gross_pay != gross:
                 fields["deductions_confirmed"] = False  # tax depends on gross, so it must be checked again
             Payslip.objects.filter(pk=old.pk).update(**fields)
         else:
@@ -203,7 +235,33 @@ def fill_run(run, now=None):
     return run
 
 
+@transaction.atomic
+def set_sick_pay(user, payslip, amount):
+    """Statutory sick pay as worked out by the accountant. Changing it means the tax must be checked again."""
+    payslip = Payslip.objects.select_for_update(of=("self",)).select_related("pay_run").get(pk=payslip.pk)
+    if payslip.pay_run.status != RunStatus.DRAFT:
+        fail("status", "This payslip has been approved and can no longer be changed.")
+    if not payslip.sick_dates:
+        fail("sick_pay", "This person has no sick days in this pay run.")
+    if amount < 0:
+        fail("sick_pay", "Sick pay cannot be negative.")
+    lines = [line for line in payslip.earnings if line["label"] != "Statutory sick pay"]
+    if amount:
+        lines.append({"label": "Statutory sick pay", "minutes": 0, "rate": "", "amount": str(amount)})
+    gross = sum((Decimal(line["amount"]) for line in lines), Decimal("0"))
+    if payslip.total_deductions > gross:
+        fail("sick_pay", "The deductions are already more than the gross pay would be.")
+    if gross != payslip.gross_pay:
+        payslip.deductions_confirmed = False
+    payslip.sick_pay, payslip.earnings, payslip.gross_pay = amount, lines, gross
+    payslip.deductions_by = user
+    payslip.save()
+    return payslip
+
+
+@transaction.atomic
 def set_deductions(user, payslip, data: dict, confirmed):
+    payslip = Payslip.objects.select_for_update(of=("self",)).select_related("pay_run").get(pk=payslip.pk)
     if payslip.pay_run.status != RunStatus.DRAFT:
         fail("status", "This payslip has been approved and can no longer be changed.")
     for field in ("income_tax", "national_insurance", "pension", "student_loan", "other_deductions"):
@@ -225,10 +283,14 @@ def blockers(run):
     problems = []
     for slip in run.payslips.select_related("employee__user"):
         who = slip.employee.employee_number
-        if any(item["reason"] == "no_rate" for item in slip.held):
-            problems.append(f"{who} has hours but no hourly rate for those days.")
-        if slip.paid_minutes > 0 and not slip.deductions_confirmed:
-            problems.append(f"{who}: tax, National Insurance and other deductions have not been confirmed.")
+        reasons = {item["reason"] for item in slip.held}
+        if "no_rate" in reasons:
+            problems.append(f"{who} has hours or leave but no hourly rate for those days.")
+        if "no_typical_day" in reasons:
+            problems.append(f"{who} has annual leave to pay but no pay history yet: set their typical day length.")
+        if (slip.gross_pay > 0 or slip.sick_dates) and not slip.deductions_confirmed:
+            what = "sick pay, tax, National Insurance and other deductions" if slip.sick_dates else "tax, National Insurance and other deductions"
+            problems.append(f"{who}: {what} have not been confirmed.")
         if slip.net_pay < 0:
             problems.append(f"{who}: net pay would be below zero.")
     return problems
@@ -241,8 +303,13 @@ def approve_run(user, run, template):
         fail("status", "This pay run is already approved.")
     problems = blockers(run)
     clash = paid_record_ids(exclude_run=run) & {i for slip in run.payslips.all() for i in slip.record_ids}
+    annual, sick = calc.paid_leave_dates(exclude_run=run)
+    for slip in run.payslips.all():
+        for mine, others in ((slip.leave_dates, annual), (slip.sick_dates, sick)):
+            if any(set(dates) & others.get(int(request_id), set()) for request_id, dates in mine.items()):
+                clash = True
     if clash:
-        problems.append("Some hours were already paid in another run. Rebuild this draft first.")
+        problems.append("Some hours or leave were already paid in another run. Rebuild this draft first.")
     if problems:
         raise ValidationError({"problems": problems})
     run.status = RunStatus.APPROVED

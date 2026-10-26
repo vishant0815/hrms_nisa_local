@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from apps.notifications.api import admin_users, notify
 
-from . import services
+from . import attachments, services
 from .models import PayRun, RunStatus
 
 
@@ -56,7 +56,8 @@ def send_due_payslips(today=None):
                 queued += notify("payslip_ready", [slip.employee.user], {
                     "period_start": run.period_start.isoformat(), "period_end": run.period_end.isoformat(),
                     "pay_date": run.pay_date.isoformat(), "hours": f"{Decimal(slip.paid_minutes) / 60:.2f}",
-                    "net_pay": f"{slip.net_pay:.2f}",
+                    "net_pay": f"{slip.net_pay:.2f}", "payslip_id": slip.pk,
+                    "attach": bool(slip.pdf) and attachments.can_protect(slip.employee),
                 }, f"payslip:{slip.pk}")
                 slip.emailed_at = timezone.now()
                 slip.save(update_fields=["emailed_at"])

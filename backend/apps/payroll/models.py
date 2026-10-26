@@ -70,6 +70,11 @@ class PayDetails(models.Model):
     ni_number = models.CharField(max_length=13, blank=True)
     tax_code = models.CharField(max_length=10, blank=True)
     account_name = models.CharField(max_length=60, blank=True)
+    date_of_birth_encrypted = models.TextField(blank=True)
+    typical_day_minutes = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text="Used for holiday pay until there is enough pay history to average (a new starter, or the first weeks).",
+    )
     sort_code_encrypted = models.TextField(blank=True)
     account_number_encrypted = models.TextField(blank=True)
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
@@ -122,6 +127,9 @@ class Payslip(models.Model):
     days = models.JSONField(default=list, help_text="One row per attendance record that is paid on this payslip.")
     held = models.JSONField(default=list, help_text="Records not paid yet, and why.")
     record_ids = models.JSONField(default=list)
+    leave_dates = models.JSONField(default=dict, help_text="Annual leave paid on this payslip: {request id: [dates]}.")
+    sick_dates = models.JSONField(default=dict, help_text="Sick days covered by this payslip: {request id: [dates]}.")
+    sick_pay = models.DecimalField(max_digits=9, decimal_places=2, default=0, help_text="Statutory sick pay, from the accountant.")
     earnings = models.JSONField(default=list, help_text="Pay lines: label, minutes, rate, amount.")
 
     income_tax = models.DecimalField(max_digits=9, decimal_places=2, default=0)
@@ -139,6 +147,7 @@ class Payslip(models.Model):
         ordering = ["employee__employee_number"]
         constraints = [
             models.UniqueConstraint(fields=["pay_run", "employee"], name="one_payslip_per_person_per_run"),
+            models.CheckConstraint(condition=Q(sick_pay__gte=0), name="payslip_sick_pay_not_negative"),
             models.CheckConstraint(
                 condition=Q(income_tax__gte=0, national_insurance__gte=0, pension__gte=0, student_loan__gte=0, other_deductions__gte=0),
                 name="payslip_deductions_not_negative",

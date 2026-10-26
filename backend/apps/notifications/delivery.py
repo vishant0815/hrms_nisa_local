@@ -4,12 +4,12 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage, send_mail
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from .emails import RENDERERS, clean_subject
+from .emails import RENDERERS, clean_subject, load_attachment_builder
 from .models import Notification, NotificationStatus
 
 log = logging.getLogger(__name__)
@@ -58,7 +58,15 @@ def deliver(notification_id, now=None):
             return item
         try:
             subject, body = renderer(item.context, item.recipient)
-            send_mail(clean_subject(subject), body, settings.DEFAULT_FROM_EMAIL, [item.recipient.email])
+            builder = load_attachment_builder(item.kind)
+            files = builder(item.context, item.recipient) if builder else []
+            if files:
+                message = EmailMessage(clean_subject(subject), body, settings.DEFAULT_FROM_EMAIL, [item.recipient.email])
+                for filename, content, mimetype in files:
+                    message.attach(filename, content, mimetype)
+                message.send(fail_silently=False)
+            else:
+                send_mail(clean_subject(subject), body, settings.DEFAULT_FROM_EMAIL, [item.recipient.email])
         except Exception as error:  # a mail server problem must not lose the email
             log.warning("Email %s failed: %s", item.pk, type(error).__name__)
             item.attempts += 1
