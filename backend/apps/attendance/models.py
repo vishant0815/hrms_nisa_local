@@ -10,7 +10,8 @@ class ReviewStatus(models.TextChoices):
 
 
 class Source(models.TextChoices):
-    DEVICE = "device", "Clocked on a device"
+    DEVICE = "device", "Clocked in the app"
+    FINGERPRINT = "fingerprint", "Fingerprint device"
     MANUAL = "manual", "Added by a manager"
 
 
@@ -42,7 +43,11 @@ class AttendanceRecord(models.Model):
 
     late_minutes = models.PositiveIntegerField(default=0)
     flags = models.JSONField(default=list, blank=True, help_text="Things a manager may want to look at.")
-    source = models.CharField(max_length=10, choices=Source.choices, default=Source.DEVICE)
+    source = models.CharField(max_length=12, choices=Source.choices, default=Source.DEVICE)
+    break_basis = models.CharField(
+        max_length=6, blank=True, default="", choices=[("", "Hours worked"), ("rota", "Rota shift"), ("actual", "Hours worked")],
+        help_text="Which length decides the break allowance when the rota and the hours worked disagree. A manager sets it.",
+    )
 
     review_status = models.CharField(max_length=15, choices=ReviewStatus.choices, default=ReviewStatus.NOT_REQUIRED)
     reviewed_by = models.ForeignKey(

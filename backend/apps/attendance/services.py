@@ -12,7 +12,15 @@ Flags (the record is saved, and a manager is asked to look)
   - no_location:   no location was shared
   - shared_device: the same device was used by someone else in the last 12 hours
   - late_clock_out: clocked out more than 4 hours after the shift ended (probably forgotten)
-  Informational only (no review): left_early, manually_edited, manual_entry.
+  Fingerprint device and breaks (see apps.fingerprint):
+  - app_instead_of_device: clocked on the phone although the shop has a fingerprint device
+  - wrong_store_device:    the fingerprint device is at a different shop from the shift
+  - app_device_mismatch:   the phone and the fingerprint device disagree by more than 5 minutes
+  - delayed_punch:         the device sent the punch late, so its own clock was used
+  - break_not_allowed:     a break on a shift under 6 hours
+  - break_hours_differ:    the rota length and the hours worked give different paid break time
+  - break_not_ended:       no break-end punch, so the break was closed at clock-out
+  Informational only (no review): left_early, manually_edited, manual_entry, break_over, no_break.
   Flags from clock-out are written with an "out:" prefix.
 
 A store with no location set up cannot be checked, so it never raises location flags.
@@ -29,6 +37,9 @@ from apps.rota.models import Shift, ShiftStatus, WeekStatus
 from apps.rota.services import lock_employee, shift_span
 
 from . import alerts
+from apps.fingerprint import breaks
+from apps.fingerprint.models import ClockDevice
+
 from .geo import distance_m
 from .models import AttendanceEdit, AttendanceRecord, ReviewStatus, Source
 
@@ -40,7 +51,11 @@ LEFT_EARLY_BY = timedelta(minutes=15)
 MIN_SHIFT_LENGTH = timedelta(minutes=1)
 MAX_RECORD_LENGTH = timedelta(hours=20)
 
-REVIEW_FLAGS = {"out_of_area", "poor_accuracy", "no_location", "shared_device", "late_clock_out"}
+REVIEW_FLAGS = {
+    "out_of_area", "poor_accuracy", "no_location", "shared_device", "late_clock_out",
+    "app_instead_of_device", "wrong_store_device", "app_device_mismatch", "delayed_punch",
+    "break_not_allowed", "break_hours_differ", "break_not_ended",
+}
 OUT = "out:"
 
 
@@ -85,6 +100,10 @@ def assess_location(store, latitude, longitude, accuracy_m):
     if accuracy_m is None or accuracy_m > ACCURACY_LIMIT_M:
         flags.append("poor_accuracy")
     return away, flags
+
+
+def store_has_clock_device(store):
+    return ClockDevice.objects.filter(store=store, is_active=True).exists()
 
 
 def device_is_shared(employee, device_id, now):
@@ -145,7 +164,9 @@ def _check_employed(employee, now):
 
 
 @transaction.atomic
-def clock_in(*, employee, latitude=None, longitude=None, accuracy_m=None, device_id="", now=None):
+def clock_in(*, employee, latitude=None, longitude=None, accuracy_m=None, device_id="", now=None, via=None,
+             extra_flags=()):
+    """`via` is the fingerprint device when the punch came from one: then there is no phone location to check."""
     now = now or current_time()
     lock_employee(employee)
     _check_employed(employee, now)
@@ -154,15 +175,23 @@ def clock_in(*, employee, latitude=None, longitude=None, accuracy_m=None, device
 
     shift = find_shift(employee, now)
     store = shift.rota_week.store
-    distance, flags = assess_location(store, latitude, longitude, accuracy_m)
-    if device_is_shared(employee, device_id, now):
-        flags.append("shared_device")
+    if via is not None:
+        distance, flags, source = None, [], Source.FINGERPRINT
+        if via.store_id != store.pk:
+            flags.append("wrong_store_device")
+    else:
+        distance, flags, source = assess_location(store, latitude, longitude, accuracy_m) + (Source.DEVICE,)
+        if device_is_shared(employee, device_id, now):
+            flags.append("shared_device")
+        if store_has_clock_device(store):
+            flags.append("app_instead_of_device")
+    flags += [flag for flag in extra_flags if flag not in flags]
     begins, _ = shift_span(shift.date, shift.start_time, shift.end_time)
     late = max(0, int((local_naive(now) - begins).total_seconds() // 60))
     record = AttendanceRecord.objects.create(
         employee=employee, store=store, shift=shift, clock_in_at=now,
         in_latitude=latitude, in_longitude=longitude, in_accuracy_m=accuracy_m,
-        in_distance_m=distance, in_device_id=device_id, late_minutes=late, flags=flags,
+        in_distance_m=distance, in_device_id=device_id, late_minutes=late, flags=flags, source=source,
         review_status=ReviewStatus.PENDING if needs_review(flags) else ReviewStatus.NOT_REQUIRED,
     )
     if record.review_status == ReviewStatus.PENDING:
@@ -171,7 +200,8 @@ def clock_in(*, employee, latitude=None, longitude=None, accuracy_m=None, device
 
 
 @transaction.atomic
-def clock_out(*, employee, latitude=None, longitude=None, accuracy_m=None, device_id="", now=None):
+def clock_out(*, employee, latitude=None, longitude=None, accuracy_m=None, device_id="", now=None, via=None,
+              extra_flags=()):
     now = now or current_time()
     lock_employee(employee)
     record = (
@@ -185,10 +215,17 @@ def clock_out(*, employee, latitude=None, longitude=None, accuracy_m=None, devic
     if now - record.clock_in_at < MIN_SHIFT_LENGTH:
         raise AttendanceError("too_soon", "You only just clocked in. Please wait a moment.", 409)
 
-    distance, flags = assess_location(record.store, latitude, longitude, accuracy_m)
-    flags = [OUT + flag for flag in flags]
-    if device_is_shared(employee, device_id, now):
-        flags.append(OUT + "shared_device")
+    if via is not None:
+        distance, flags = None, []
+    else:
+        distance, flags = assess_location(record.store, latitude, longitude, accuracy_m)
+        flags = [OUT + flag for flag in flags]
+        if device_is_shared(employee, device_id, now):
+            flags.append(OUT + "shared_device")
+        if store_has_clock_device(record.store):
+            flags.append(OUT + "app_instead_of_device")
+    flags += [flag for flag in extra_flags if flag not in flags]
+    flags += breaks.finish(record, now)
     if record.shift is not None:
         _, finishes = shift_span(record.shift.date, record.shift.start_time, record.shift.end_time)
         here = local_naive(now)

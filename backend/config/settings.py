@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.visa",
     "apps.rota",
     "apps.attendance",
+    "apps.fingerprint",
     "apps.notifications",
     "apps.leave",
 ]

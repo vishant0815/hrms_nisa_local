@@ -17,6 +17,15 @@ FLAG_MESSAGES = {
     "left_early": "Clocked out before the shift ended.",
     "manually_edited": "A manager changed the times.",
     "manual_entry": "Added by a manager.",
+    "app_instead_of_device": "Clocked on the app instead of the fingerprint device.",
+    "wrong_store_device": "The fingerprint device is at a different shop from the shift.",
+    "app_device_mismatch": "The app and the fingerprint device times differ by more than 5 minutes.",
+    "delayed_punch": "The fingerprint device sent this late, so the device's own time was used.",
+    "break_not_allowed": "A break was taken on a shift under 6 hours.",
+    "break_hours_differ": "The rota hours and the hours worked give a different paid break. A manager should decide which counts.",
+    "break_not_ended": "The break was not ended, so it was closed at clock-out.",
+    "break_over": "Took more break than the allowance.",
+    "no_break": "No break was taken on a shift that has one.",
 }
 
 
@@ -45,7 +54,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
         fields = [
             "id", "employee", "store", "shift", "clock_in_at", "clock_out_at", "worked_minutes",
             "late_minutes", "in_distance_m", "out_distance_m", "in_accuracy_m", "out_accuracy_m", "flags",
-            "source", "review_status", "reviewed_by", "reviewed_at", "review_note", "created_at",
+            "source", "break_basis", "review_status", "reviewed_by", "reviewed_at", "review_note", "created_at",
         ]
         read_only_fields = fields
 
