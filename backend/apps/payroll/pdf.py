@@ -153,7 +153,10 @@ def render(slip, template, details, ytd, logo_bytes=None):
     column = (USABLE - gap) / 2
     earn = [["Item", "Hours", "Rate", "Amount"]]
     for line in slip.earnings:
-        earn.append([line["label"], hours(line["minutes"]), money(line["rate"]), money(line["amount"])])
+        if line["rate"]:
+            earn.append([line["label"], hours(line["minutes"]), money(line["rate"]), money(line["amount"])])
+        else:
+            earn.append([line["label"], "-", "-", money(line["amount"])])
     earn.append(["Gross pay", "", "", money(slip.gross_pay)])
     ded = [
         ["Item", "This pay", "Year to date"],

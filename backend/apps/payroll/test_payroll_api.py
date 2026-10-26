@@ -127,6 +127,7 @@ class PayDetailsTests(ApiBase):
         self.assertEqual(response.json(), {
             "ni_number": "AB******C", "tax_code": "1257L", "account_name": "S Employee",
             "sort_code": "**-**-56", "account_number": "****5678", "has_bank_details": True,
+            "date_of_birth": "", "has_date_of_birth": False, "typical_day_hours": None,
         })
         details = PayDetails.objects.get()
         self.assertEqual(details.ni_number, "AB123456C")

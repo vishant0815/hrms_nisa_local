@@ -14,6 +14,7 @@ urlpatterns = [
     path("payslips/<int:pk>/", views.PayslipDetailView.as_view(), name="payslip"),
     path("payslips/<int:pk>/deductions/", views.PayslipDeductionsView.as_view(), name="payslip-deductions"),
     path("attendance/<int:pk>/approve-extra-hours/", views.ExtraHoursView.as_view(), name="approve-extra-hours"),
+    path("payslips/<int:pk>/sick-pay/", views.PayslipSickPayView.as_view(), name="payslip-sick-pay"),
     path("payslips/<int:pk>/pdf/", views.PayslipPdfView.as_view(), name="payslip-pdf"),
     path("pay-runs/<int:pk>/bank-file/", views.PayRunBankFileView.as_view(), name="pay-run-bank-file"),
     path("me/payslips/<int:pk>/pdf/", views.MyPayslipPdfView.as_view(), name="my-payslip-pdf"),

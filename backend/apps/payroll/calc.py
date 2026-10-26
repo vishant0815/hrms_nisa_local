@@ -104,8 +104,109 @@ def first_run_start():
     return first.period_start if first else None
 
 
-def build_payslip_data(employee, period_end, paid_ids, now, since):
+def date_range(start, end):
+    day = start
+    while day <= end:
+        yield day
+        day += timedelta(days=1)
+
+
+def paid_leave_dates(exclude_run=None):
+    """Leave days already on an approved payslip: ({request id: {dates}} for annual, the same for sick)."""
+    from .models import Payslip, RunStatus
+
+    annual, sick = defaultdict(set), defaultdict(set)
+    slips = Payslip.objects.filter(pay_run__status__in=[RunStatus.APPROVED, RunStatus.SENT])
+    if exclude_run is not None:
+        slips = slips.exclude(pay_run=exclude_run)
+    for leave_dates, sick_dates in slips.values_list("leave_dates", "sick_dates"):
+        for request_id, dates in leave_dates.items():
+            annual[int(request_id)].update(dates)
+        for request_id, dates in sick_dates.items():
+            sick[int(request_id)].update(dates)
+    return annual, sick
+
+
+def average_day_minutes(employee, pay_date, exclude_run=None):
+    """Minutes in an average paid working day over the last 52 weeks of payslips, or None with no history."""
+    from .models import Payslip, RunStatus
+
+    slips = Payslip.objects.filter(
+        employee=employee, pay_run__status__in=[RunStatus.APPROVED, RunStatus.SENT],
+        pay_run__pay_date__lt=pay_date, pay_run__pay_date__gte=pay_date - timedelta(days=364),
+    )
+    if exclude_run is not None:
+        slips = slips.exclude(pay_run=exclude_run)
+    minutes = days = 0
+    for paid, rows in slips.values_list("paid_minutes", "days"):
+        minutes += paid
+        days += len({row["date"] for row in rows})
+    if days == 0:
+        return None
+    return int((Decimal(minutes) / days).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def leave_requests(employee, period_end, since):
+    from apps.leave.models import LeaveKind, LeaveRequest, LeaveStatus
+
+    return list(LeaveRequest.objects.filter(
+        employee=employee, status=LeaveStatus.APPROVED, kind__in=[LeaveKind.ANNUAL, LeaveKind.SICK],
+        start_date__lte=period_end, end_date__gte=since,
+    ).order_by("start_date"))
+
+
+def unpaid_dates(request, period_end, since, already):
+    last = min(request.end_date, period_end)
+    first = max(request.start_date, since)
+    return [d for d in date_range(first, last) if d.isoformat() not in already.get(request.pk, ())]
+
+
+def holiday_data(employee, requests, rates, period_end, since, paid_annual, typical_day, average_day):
+    """(minutes by rate, leave dates by request, held items) for annual leave not yet paid."""
+    from apps.leave.models import LeaveKind
+
+    minutes_by_rate, dates_by_request, held = defaultdict(Decimal), {}, []
+    for request in requests:
+        if request.kind != LeaveKind.ANNUAL:
+            continue
+        dates = unpaid_dates(request, period_end, since, paid_annual)
+        if not dates:
+            continue
+        day_minutes = average_day if average_day is not None else typical_day
+        calendar_days = (request.end_date - request.start_date).days + 1
+        charged = request.days_charged if request.days_charged is not None else request.days_requested
+        per_date = Decimal(charged) / calendar_days
+        paid = []
+        for day in dates:
+            rate = rate_on(rates, day)
+            reason = "no_rate" if rate is None else ("no_typical_day" if day_minutes is None else None)
+            if reason:
+                held.append({"record_id": None, "request_id": request.pk, "date": day.isoformat(), "reason": reason, "minutes": 0, "store_id": None})
+                continue
+            minutes_by_rate[rate] += per_date * day_minutes
+            paid.append(day.isoformat())
+        if paid:
+            dates_by_request[str(request.pk)] = paid
+    return minutes_by_rate, dates_by_request, held
+
+
+def sick_data(requests, period_end, since, paid_sick):
+    dates_by_request = {}
+    from apps.leave.models import LeaveKind
+
+    for request in requests:
+        if request.kind != LeaveKind.SICK:
+            continue
+        dates = unpaid_dates(request, period_end, since, paid_sick)
+        if dates:
+            dates_by_request[str(request.pk)] = [d.isoformat() for d in dates]
+    return dates_by_request
+
+
+def build_payslip_data(employee, run, paid_ids, paid_leave, now, since, details=None):
     """The numbers for one person, or None when there is nothing to show."""
+    period_end = run.period_end
+    paid_annual, paid_sick = paid_leave
     records = (
         AttendanceRecord.objects.filter(
             employee=employee, clock_in_at__lt=start_of_day(period_end + timedelta(days=1)),
@@ -115,13 +216,20 @@ def build_payslip_data(employee, period_end, paid_ids, now, since):
         .select_related("shift", "store").prefetch_related("breaks").order_by("clock_in_at")
     )
     records = list(records)
-    if not records:
+    requests = leave_requests(employee, period_end, since)
+    rates = list(PayRate.objects.filter(employee=employee).order_by("-effective_from"))
+    average_day = average_day_minutes(employee, run.pay_date, exclude_run=run)
+    typical = details.typical_day_minutes if details else None
+    holiday_minutes, leave_dates, leave_held = holiday_data(
+        employee, requests, rates, period_end, since, paid_annual, typical, average_day
+    )
+    sick_dates = sick_data(requests, period_end, since, paid_sick)
+    if not records and not holiday_minutes and not leave_held and not sick_dates:
         return None
     approved_ids = set(HoursApproval.objects.filter(record__in=records).values_list("record_id", flat=True))
-    rates = list(PayRate.objects.filter(employee=employee).order_by("-effective_from"))
     tolerance = settings.PAYROLL_EXTRA_HOURS_TOLERANCE_MINUTES
 
-    days, held, minutes_by_rate = [], [], defaultdict(int)
+    days, held, minutes_by_rate = [], list(leave_held), defaultdict(int)
     store_minutes = defaultdict(int)
     for record in records:
         reason = classify(record, now, approved_ids, tolerance)
@@ -145,10 +253,18 @@ def build_payslip_data(employee, period_end, paid_ids, now, since):
         amount = pounds(Decimal(minutes_by_rate[rate]) * rate / 60)
         earnings.append({"label": "Basic pay", "minutes": minutes_by_rate[rate], "rate": str(rate), "amount": str(amount)})
         gross += amount
-    store_id = max(store_minutes, key=store_minutes.get) if store_minutes else (held[0]["store_id"] if held else None)
+    for rate in sorted(holiday_minutes):
+        minutes = int(holiday_minutes[rate].quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        amount = pounds(Decimal(minutes) * rate / 60)
+        earnings.append({"label": "Holiday pay", "minutes": minutes, "rate": str(rate), "amount": str(amount)})
+        gross += amount
+    store_id = max(store_minutes, key=store_minutes.get) if store_minutes else (
+        next((h["store_id"] for h in held if h["store_id"]), None)
+    )
     return {
         "days": days, "held": held, "earnings": earnings, "gross_pay": gross,
         "paid_minutes": sum(row["paid_minutes"] for row in days),
         "unpaid_break_minutes": sum(row["unpaid_break"] for row in days),
         "record_ids": [row["record_id"] for row in days], "store_id": store_id,
+        "leave_dates": leave_dates, "sick_dates": sick_dates,
     }

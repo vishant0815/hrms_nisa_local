@@ -206,8 +206,14 @@ def pay_week(ctx):
 
 def payslip_ready(ctx, user):
     lines = [f"Your payslip for {pay_week(ctx)} is ready.", "",
-             f"  Pay date: {day(ctx['pay_date'])}", f"  Hours paid: {ctx['hours']}", f"  Net pay: £{ctx['net_pay']}", "",
-             "Sign in to see the full payslip and download the PDF. It is not attached to this email, to keep your pay details private."]
+             f"  Pay date: {day(ctx['pay_date'])}", f"  Hours paid: {ctx['hours']}", f"  Net pay: £{ctx['net_pay']}", ""]
+    if ctx.get("attach"):
+        lines += ["Your payslip is attached as a PDF. It is protected by a password: your first name in lower case "
+                  "followed by your date of birth as mmyydd (month, last two digits of the year, day).",
+                  "For example, Alex born on 5 June 1990 would use alex069005."]
+    else:
+        lines += ["Your payslip could not be attached because we do not have your date of birth, which protects the PDF. "
+                  "Sign in to see it and download the PDF."]
     return "Your payslip is ready", compose(user, lines, "/payslips", "See your payslip")
 
 
@@ -224,6 +230,23 @@ def payroll_not_approved(ctx, user):
     lines = [f"The pay run for {pay_week(ctx)} has not been approved, so no payslips were sent.",
              f"The pay date was {day(ctx['pay_date'])}. Approve it and the payslips will go out."]
     return "Payslips not sent: pay run not approved", compose(user, lines, f"/payroll/{ctx['run_id']}", "Open the pay run")
+
+
+# Emails that carry an attachment name the function that builds it ("module:function"); it is imported
+# only when such an email is sent, so this app does not depend on the app that owns the attachment.
+ATTACHMENTS = {
+    "payslip_ready": "apps.payroll.attachments:payslip_pdf",
+}
+
+
+def load_attachment_builder(kind):
+    path = ATTACHMENTS.get(kind)
+    if path is None:
+        return None
+    from importlib import import_module
+
+    module, name = path.split(":")
+    return getattr(import_module(module), name)
 
 
 RENDERERS = {
