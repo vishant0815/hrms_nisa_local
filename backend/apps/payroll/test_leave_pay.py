@@ -235,7 +235,8 @@ class SickPayTests(LeavePayBase):
 
     def test_sick_pay_is_refused_for_someone_who_was_not_sick_or_when_negative_or_too_small_for_the_deductions(self):
         other = self.rec(0, "09:00", "17:00", who=self.emp_b)
-        services.add_rate(self.hr, self.emp_b, Decimal("10"), MON)
+        services.add_rate(self.hr, self.emp_b, Decimal("11"), MON)
+        services.set_pay_details(self.hr, self.emp_b, {"date_of_birth": date(2007, 6, 1)})
         run = self.run_for()
         with self.assertRaisesMessage(ValidationError, "no sick days"):
             services.set_sick_pay(self.hr, self.slip(run, self.emp_b), Decimal("5"))

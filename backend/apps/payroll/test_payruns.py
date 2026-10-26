@@ -28,6 +28,8 @@ class PayBase(RotaTestBase):
         super().setUp()
         self.worker = self.emp_a
         services.add_rate(self.hr, self.worker, Decimal("12.00"), date(2026, 1, 1))
+        # Everyone is 19 unless a test says otherwise: the minimum wage check needs a date of birth.
+        services.set_pay_details(self.hr, self.worker, {"date_of_birth": date(2007, 6, 1)})
 
     def rec(self, n, start, end, who=None, shift=True, rota=None, **extra):
         """One finished record on day n of the pay week (clock times as 'HH:MM'; end may be next day)."""
@@ -171,6 +173,7 @@ class HoursToPayTests(PayBase):
 
     def test_a_rate_that_starts_after_the_work_does_not_count(self):
         services.add_rate(self.hr, self.emp_b, Decimal("11.00"), MON + timedelta(days=3))
+        services.set_pay_details(self.hr, self.emp_b, {"date_of_birth": date(2007, 6, 1)})
         AttendanceRecord.objects.create(
             employee=self.emp_b, store=self.store_b, clock_in_at=when(MON, "09:00"), clock_out_at=when(MON, "17:00")
         )

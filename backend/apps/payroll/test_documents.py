@@ -163,6 +163,7 @@ class BankFileTests(DocBase):
     def test_people_without_bank_details_are_named_and_no_file_is_made(self):
         AttendanceRecord.objects.create(employee=self.emp_b, store=self.store_b, clock_in_at=when(MON, "09:00"), clock_out_at=when(MON, "17:00"))
         services.add_rate(self.hr, self.emp_b, Decimal("11.00"), MON)
+        services.set_pay_details(self.hr, self.emp_b, {"date_of_birth": date(2007, 6, 1)})
         services.fill_run(self.run)
         self.approve()
         response = self.fetch()

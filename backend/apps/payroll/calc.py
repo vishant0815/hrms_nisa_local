@@ -22,6 +22,18 @@ from apps.fingerprint import breaks
 
 from .models import HoursApproval, PayRate
 
+_BANK_HOLIDAYS = {}
+
+
+def bank_holiday(day):
+    """Name of the England & Wales bank holiday on this day, or ''."""
+    import holidays
+
+    if day.year not in _BANK_HOLIDAYS:
+        _BANK_HOLIDAYS[day.year] = holidays.country_holidays("GB", subdiv="ENG", years=day.year)
+    return _BANK_HOLIDAYS[day.year].get(day, "")
+
+
 PENNY = Decimal("0.01")
 
 
@@ -229,7 +241,8 @@ def build_payslip_data(employee, run, paid_ids, paid_leave, now, since, details=
     approved_ids = set(HoursApproval.objects.filter(record__in=records).values_list("record_id", flat=True))
     tolerance = settings.PAYROLL_EXTRA_HOURS_TOLERANCE_MINUTES
 
-    days, held, minutes_by_rate = [], list(leave_held), defaultdict(int)
+    multiplier = Decimal(str(settings.PAYROLL_BANK_HOLIDAY_MULTIPLIER))
+    days, held, minutes_by_rate, premium_minutes = [], list(leave_held), defaultdict(int), defaultdict(int)
     store_minutes = defaultdict(int)
     for record in records:
         reason = classify(record, now, approved_ids, tolerance)
@@ -244,14 +257,22 @@ def build_payslip_data(employee, run, paid_ids, paid_leave, now, since, details=
             continue
         row = record_row(record, now)
         row["rate"] = str(rate)
+        row["bank_holiday"] = bank_holiday(local_day(record.clock_in_at))
         days.append(row)
-        minutes_by_rate[rate] += row["paid_minutes"]
+        if row["bank_holiday"] and multiplier != 1:
+            premium_minutes[pounds(rate * multiplier)] += row["paid_minutes"]
+        else:
+            minutes_by_rate[rate] += row["paid_minutes"]
         store_minutes[record.store_id] += row["paid_minutes"]
 
     earnings, gross = [], Decimal("0")
     for rate in sorted(minutes_by_rate):
         amount = pounds(Decimal(minutes_by_rate[rate]) * rate / 60)
         earnings.append({"label": "Basic pay", "minutes": minutes_by_rate[rate], "rate": str(rate), "amount": str(amount)})
+        gross += amount
+    for rate in sorted(premium_minutes):
+        amount = pounds(Decimal(premium_minutes[rate]) * rate / 60)
+        earnings.append({"label": "Bank holiday pay", "minutes": premium_minutes[rate], "rate": str(rate), "amount": str(amount)})
         gross += amount
     for rate in sorted(holiday_minutes):
         minutes = int(holiday_minutes[rate].quantize(Decimal("1"), rounding=ROUND_HALF_UP))

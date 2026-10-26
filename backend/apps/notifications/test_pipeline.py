@@ -256,10 +256,17 @@ class KafkaAdapterTests(PipelineBase):
                 raise RuntimeError("boom")
 
         with mock.patch.dict(sys.modules, {"confluent_kafka": library}):
-            KafkaBus("k:1", "t", "g").consume(handler, once=True)
+            KafkaBus("k:1", "t", "g").consume(handler, once=True, idle_seconds=0)
         self.assertEqual(seen, ["a", "b", "c"])
         self.assertEqual(len([c for c in commits if c != "closed"]), 3)
         self.assertEqual(commits[-1], "closed")
+
+    def test_once_waits_through_empty_polls_while_the_consumer_joins_its_group(self):
+        library, _, _ = self.fake_library(messages=[None, None, self.message("a")])
+        seen = []
+        with mock.patch.dict(sys.modules, {"confluent_kafka": library}):
+            KafkaBus("k:1", "t", "g").consume(seen.append, once=True, idle_seconds=5)
+        self.assertEqual(seen, ["a"])
 
     def test_automatic_commit_is_off_so_a_crash_means_redelivery(self):
         library, _, _ = self.fake_library()
@@ -273,7 +280,7 @@ class KafkaAdapterTests(PipelineBase):
 
         library.Consumer = Spy
         with mock.patch.dict(sys.modules, {"confluent_kafka": library}):
-            KafkaBus("k:1", "t", "g").consume(lambda text: None, once=True)
+            KafkaBus("k:1", "t", "g").consume(lambda text: None, once=True, idle_seconds=0)
         self.assertIs(captured["enable.auto.commit"], False)
 
 

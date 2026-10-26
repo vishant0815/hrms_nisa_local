@@ -62,7 +62,7 @@ class ScheduleTests(PayBase):
         sent = inbox(self.worker.user.email)
         self.assertEqual(len(sent), 1)
         body = sent[0].body
-        for expected in ("Mon 19 Oct to Sun 25 Oct", "Thu 29 Oct", "Hours paid: 38.83", "Net pay: £421.20", "https://hr.example/payslips"):
+        for expected in ("Mon 19 Oct to Sun 25 Oct", "Thu 29 Oct", "Hours paid: 38.83", "Net pay: £403.28", "https://hr.example/payslips"):
             self.assertIn(expected, body)
         self.assertEqual(sent[0].attachments, [])
         self.assertNotIn("AB", body.replace("ABOUT", ""))

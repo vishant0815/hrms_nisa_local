@@ -170,6 +170,16 @@ class PayslipDeductionsView(APIView):
         return Response(PayslipSerializer(payslip).data)
 
 
+class PayslipSuggestView(APIView):
+    """Work out tax, National Insurance, student loan and pension again from the person's current pay details."""
+
+    permission_classes = [IsOwnerOrHR]
+
+    def post(self, request, pk):
+        payslip = get_object_or_404(Payslip, pk=pk)
+        return Response(PayslipSerializer(services.suggest_deductions(request.user, payslip)).data)
+
+
 class PayslipSickPayView(APIView):
     """Statutory sick pay as worked out by the accountant, for someone who was off sick this week."""
 
