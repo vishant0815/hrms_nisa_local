@@ -179,3 +179,12 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "HRMS <no-reply@exampl
 
 KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+# Payroll. Bank details are stored encrypted with this key (a Fernet key: 44 characters, url-safe base64).
+# Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Keep it out of git and back it up: without it the stored bank details cannot be read.
+PAYROLL_ENCRYPTION_KEY = os.environ.get("PAYROLL_ENCRYPTION_KEY", "")
+if "test" in sys.argv and not PAYROLL_ENCRYPTION_KEY:
+    PAYROLL_ENCRYPTION_KEY = "dGVzdC1vbmx5LWtleS10ZXN0LW9ubHkta2V5LTAwMDA="  # tests only
+# Clocked time longer than the rostered shift by more than this needs a manager's OK before it is paid.
+PAYROLL_EXTRA_HOURS_TOLERANCE_MINUTES = int(os.environ.get("PAYROLL_EXTRA_HOURS_TOLERANCE_MINUTES", "15"))
