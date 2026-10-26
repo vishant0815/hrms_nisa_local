@@ -44,6 +44,13 @@ class RateSerializer(serializers.ModelSerializer):
 class PayDetailsInput(serializers.Serializer):
     ni_number = serializers.CharField(max_length=20, required=False, allow_blank=True)
     tax_code = serializers.CharField(max_length=12, required=False, allow_blank=True)
+    ni_category = serializers.CharField(max_length=1, required=False, allow_blank=True)
+    student_loan_plan = serializers.ChoiceField(choices=["", "1", "2", "4", "5"], required=False)
+    postgrad_loan = serializers.BooleanField(required=False)
+    pension_opted_out = serializers.BooleanField(required=False)
+    apprentice_from = serializers.DateField(required=False, allow_null=True)
+    prior_pay = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    prior_tax = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     account_name = serializers.CharField(max_length=60, required=False, allow_blank=True)
     sort_code = serializers.CharField(max_length=12, required=False, allow_blank=True)
     account_number = serializers.CharField(max_length=14, required=False, allow_blank=True)
@@ -60,6 +67,13 @@ def mask_details(details):
     return {
         "ni_number": f"{ni[:2]}******{ni[-1:]}" if ni else "",
         "tax_code": details.tax_code if details else "",
+        "ni_category": details.ni_category if details else "",
+        "student_loan_plan": details.student_loan_plan if details else "",
+        "postgrad_loan": details.postgrad_loan if details else False,
+        "pension_opted_out": details.pension_opted_out if details else False,
+        "apprentice_from": details.apprentice_from.isoformat() if details and details.apprentice_from else None,
+        "prior_pay": str(details.prior_pay) if details and details.prior_pay is not None else None,
+        "prior_tax": str(details.prior_tax) if details and details.prior_tax is not None else None,
         "account_name": details.account_name if details else "",
         "sort_code": f"**-**-{sort_code[-2:]}" if sort_code else "",
         "account_number": f"****{account[-4:]}" if account else "",
@@ -81,7 +95,7 @@ class PayslipSerializer(serializers.ModelSerializer):
         fields = [
             "id", "number", "employee", "employee_number", "employee_name", "store", "paid_minutes",
             "unpaid_break_minutes", "gross_pay", "earnings", "days", "held", "sick_dates", "sick_pay", "income_tax", "national_insurance",
-            "pension", "student_loan", "other_deductions", "total_deductions", "net_pay", "deductions_confirmed",
+            "pension", "student_loan", "other_deductions", "total_deductions", "net_pay", "deduction_notes", "deductions_confirmed",
             "emailed_at",
         ]
 

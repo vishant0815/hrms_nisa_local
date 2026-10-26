@@ -75,6 +75,18 @@ class PayDetails(models.Model):
         null=True, blank=True,
         help_text="Used for holiday pay until there is enough pay history to average (a new starter, or the first weeks).",
     )
+    ni_category = models.CharField(
+        max_length=1, blank=True, help_text="Leave blank for the usual letter (A, or M under 21). Set C after State Pension age.",
+    )
+    student_loan_plan = models.CharField(max_length=1, blank=True, choices=[("1", "Plan 1"), ("2", "Plan 2"), ("4", "Plan 4"), ("5", "Plan 5")])
+    postgrad_loan = models.BooleanField(default=False)
+    pension_opted_out = models.BooleanField(default=False)
+    apprentice_from = models.DateField(null=True, blank=True, help_text="Start of an apprenticeship, for the apprentice minimum wage.")
+    prior_pay = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Taxable pay this tax year before the first payslip here (from the P45). Needed mid-year for a cumulative tax code.",
+    )
+    prior_tax = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Tax paid on that pay.")
     sort_code_encrypted = models.TextField(blank=True)
     account_number_encrypted = models.TextField(blank=True)
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
@@ -137,6 +149,7 @@ class Payslip(models.Model):
     pension = models.DecimalField(max_digits=9, decimal_places=2, default=0)
     student_loan = models.DecimalField(max_digits=9, decimal_places=2, default=0)
     other_deductions = models.DecimalField(max_digits=9, decimal_places=2, default=0)
+    deduction_notes = models.JSONField(default=list, blank=True, help_text="Why the suggested deductions are what they are, and what could not be worked out.")
     deductions_confirmed = models.BooleanField(default=False)
     deductions_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
 

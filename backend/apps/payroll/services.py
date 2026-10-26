@@ -1,5 +1,5 @@
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 from io import BytesIO
 
 from decimal import Decimal
@@ -13,7 +13,7 @@ from rest_framework.exceptions import ValidationError
 from apps.attendance.models import AttendanceRecord
 from apps.employees.models import EmployeeProfile
 
-from . import calc, crypto, pdf, rules
+from . import attachments, calc, crypto, deductions, minwage, pdf, rules, taxrates
 from .models import HoursApproval, PayDetails, PayRate, PayRun, Payslip, PayslipTemplate, RunStatus
 
 
@@ -79,6 +79,13 @@ def fail(field, message):
 def add_rate(user, employee, hourly_rate, effective_from):
     if hourly_rate <= 0:
         fail("hourly_rate", "The rate must be more than zero.")
+    details = PayDetails.objects.filter(employee=employee).first()
+    try:
+        low = minwage.minimum_rate(attachments.date_of_birth(employee), details.apprentice_from if details else None, effective_from)
+    except taxrates.UnsupportedTaxYear:
+        low = None  # a later year's minimum is not known yet; the pay run checks it when the time comes
+    if low is not None and hourly_rate < low:
+        fail("hourly_rate", f"£{hourly_rate} an hour is below the minimum wage of £{low} for this person on that date.")
     try:
         with transaction.atomic():
             return PayRate.objects.create(
@@ -109,6 +116,21 @@ def set_pay_details(user, employee, data: dict):
             if born >= today or born.year < today.year - 100:
                 fail("date_of_birth", "That is not a sensible date of birth.")
             details.date_of_birth_encrypted = crypto.encrypt(born.isoformat())
+    if "ni_category" in data:
+        value = data["ni_category"].strip().upper()
+        if value and value not in ("A", "M", "H", "J", "Z", "C"):
+            fail("ni_category", "Use one of A, M, H, J, Z or C, or leave it blank. Other letters are not supported yet.")
+        details.ni_category = value
+    for field in ("student_loan_plan", "postgrad_loan", "pension_opted_out", "apprentice_from"):
+        if field in data:
+            setattr(details, field, data[field])
+    if "prior_pay" in data or "prior_tax" in data:
+        pay, paid = data.get("prior_pay", details.prior_pay), data.get("prior_tax", details.prior_tax)
+        if (pay is None) != (paid is None):
+            fail("prior_pay", "Give both the pay and the tax so far from the P45, or neither.")
+        if pay is not None and (pay < 0 or paid < 0):
+            fail("prior_pay", "The pay and tax so far cannot be negative.")
+        details.prior_pay, details.prior_tax = pay, paid
     if "typical_day_hours" in data:
         hours = data["typical_day_hours"]
         if hours is None:
@@ -228,8 +250,11 @@ def fill_run(run, now=None):
             if old.gross_pay != gross:
                 fields["deductions_confirmed"] = False  # tax depends on gross, so it must be checked again
             Payslip.objects.filter(pk=old.pk).update(**fields)
+            slip = Payslip.objects.get(pk=old.pk)
         else:
-            Payslip.objects.create(pay_run=run, employee=employee, **fields)
+            slip = Payslip.objects.create(pay_run=run, employee=employee, **fields)
+        if not slip.deductions_confirmed:
+            deductions.apply_suggestion(slip, details)
     for leftover in existing.values():
         leftover.delete()
     return run
@@ -245,6 +270,13 @@ def set_sick_pay(user, payslip, amount):
         fail("sick_pay", "This person has no sick days in this pay run.")
     if amount < 0:
         fail("sick_pay", "Sick pay cannot be negative.")
+    try:
+        weekly = taxrates.rates_for(payslip.pay_run.pay_date)["ssp"]["weekly"]
+    except taxrates.UnsupportedTaxYear as problem:
+        fail("sick_pay", str(problem))
+    cap = weekly * _sick_weeks(payslip)
+    if amount > cap:
+        fail("sick_pay", f"Statutory sick pay is at most £{weekly} a week, so £{cap} at most for these days.")
     lines = [line for line in payslip.earnings if line["label"] != "Statutory sick pay"]
     if amount:
         lines.append({"label": "Statutory sick pay", "minutes": 0, "rate": "", "amount": str(amount)})
@@ -256,7 +288,26 @@ def set_sick_pay(user, payslip, amount):
     payslip.sick_pay, payslip.earnings, payslip.gross_pay = amount, lines, gross
     payslip.deductions_by = user
     payslip.save()
+    if not payslip.deductions_confirmed:
+        deductions.apply_suggestion(payslip)
     return payslip
+
+
+def _sick_weeks(payslip):
+    """How many calendar weeks the sick days touch (a part week counts as a week): the most SSP that can be owed."""
+    days = sorted(date.fromisoformat(d) for dates in payslip.sick_dates.values() for d in dates)
+    return max(1, -(-((days[-1] - days[0]).days + 1) // 7)) if days else 1
+
+
+@transaction.atomic
+def suggest_deductions(user, payslip):
+    payslip = Payslip.objects.select_for_update(of=("self",)).select_related("pay_run").get(pk=payslip.pk)
+    if payslip.pay_run.status != RunStatus.DRAFT:
+        fail("status", "This payslip has been approved and can no longer be changed.")
+    payslip.deductions_confirmed = False
+    payslip.deductions_by = user
+    payslip.save()
+    return deductions.apply_suggestion(payslip)
 
 
 @transaction.atomic
@@ -293,7 +344,24 @@ def blockers(run):
             problems.append(f"{who}: {what} have not been confirmed.")
         if slip.net_pay < 0:
             problems.append(f"{who}: net pay would be below zero.")
+    try:
+        taxrates.rates_for(run.pay_date)
+    except taxrates.UnsupportedTaxYear as problem:
+        problems.append(str(problem))
+    problems += wage_problems(run)
     return problems
+
+
+def wage_problems(run):
+    out = []
+    for slip in run.payslips.select_related("employee__user"):
+        details = PayDetails.objects.filter(employee=slip.employee).first()
+        rates = list(PayRate.objects.filter(employee=slip.employee).order_by("-effective_from"))
+        out += minwage.problems_for(
+            slip, attachments.date_of_birth(slip.employee), details.apprentice_from if details else None,
+            lambda day, rates=rates: calc.rate_on(rates, day),
+        )
+    return out
 
 
 @transaction.atomic

@@ -45,12 +45,12 @@ class ProtectedEmailTests(PayBase):
         mail.outbox = []
 
     def approved_run(self, born=date(2000, 3, 3)):
-        if born:
-            services.set_pay_details(self.hr, self.worker, {"date_of_birth": born})
         run = alerts.create_weekly_run(MONDAY_AFTER)
         for slip in run.payslips.all():
             services.set_deductions(self.hr, slip, {"income_tax": Decimal("44.80")}, True)
         services.approve_run(self.hr, run, PayslipTemplate.current())
+        # The password is worked out when the email is sent, so the date of birth that counts is the one on file then.
+        services.set_pay_details(self.hr, self.worker, {"date_of_birth": born})
         return run
 
     def test_the_payslip_email_carries_a_pdf_that_only_opens_with_the_password(self):
@@ -70,7 +70,7 @@ class ProtectedEmailTests(PayBase):
         reader.decrypt("sam030003")
         text = reader.pages[0].extract_text()
         self.assertIn("£466.00", text)
-        self.assertIn("£421.20", text)
+        self.assertIn("£403.28", text)
         with self.assertRaises(Exception):
             PdfReader(BytesIO(content)).pages[0].extract_text()  # without the password the pages cannot be read
 
@@ -82,11 +82,10 @@ class ProtectedEmailTests(PayBase):
         self.assertIn("mmyydd", body)
         self.assertIn("alex069005", body)  # a made-up worked example
         self.assertNotIn("sam030003", body)  # Sam's real password
-        self.assertIn("Net pay: £421.20", body)
+        self.assertIn("Net pay: £403.28", body)
 
     def test_the_password_follows_the_date_of_birth_on_file(self):
-        services.set_pay_details(self.hr, self.worker, {"date_of_birth": date(1990, 7, 15)})
-        self.approved_run(born=None)
+        self.approved_run(born=date(1990, 7, 15))
         alerts.send_due_payslips(THURSDAY)
         send_everything()
         reader = PdfReader(BytesIO(inbox(self.worker.user.email)[0].attachments[0][1]))

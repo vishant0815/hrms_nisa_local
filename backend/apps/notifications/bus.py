@@ -52,22 +52,29 @@ class KafkaBus:
         producer.flush(15)
         return confirmed
 
-    def consume(self, handler, once=False):
-        """Hand each id to `handler`, then commit it. A crash before the commit means it is redelivered."""
+    def consume(self, handler, once=False, idle_seconds=10):
+        """Hand each id to `handler`, then commit it. A crash before the commit means it is redelivered.
+
+        With once=True, stop after `idle_seconds` with nothing to read. It has to be long enough for the consumer
+        to join its group, which takes a few seconds on a real broker; the first poll often comes back empty.
+        """
         from confluent_kafka import Consumer
+        import time
 
         consumer = Consumer({
             "bootstrap.servers": self.servers, "group.id": self.group,
             "enable.auto.commit": False, "auto.offset.reset": "earliest",
         })
         consumer.subscribe([self.topic])
+        last_seen = time.monotonic()
         try:
             while True:
                 message = consumer.poll(1.0)
                 if message is None:
-                    if once:
+                    if once and time.monotonic() - last_seen >= idle_seconds:
                         return
                     continue
+                last_seen = time.monotonic()
                 if message.error():
                     log.warning("Kafka error: %s", message.error())
                     continue

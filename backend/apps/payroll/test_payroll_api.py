@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db import connection
@@ -127,7 +127,9 @@ class PayDetailsTests(ApiBase):
         self.assertEqual(response.json(), {
             "ni_number": "AB******C", "tax_code": "1257L", "account_name": "S Employee",
             "sort_code": "**-**-56", "account_number": "****5678", "has_bank_details": True,
-            "date_of_birth": "", "has_date_of_birth": False, "typical_day_hours": None,
+            "date_of_birth": "**/**/2007", "has_date_of_birth": True, "typical_day_hours": None,
+            "ni_category": "", "student_loan_plan": "", "postgrad_loan": False, "pension_opted_out": False,
+            "apprentice_from": None, "prior_pay": None, "prior_tax": None,
         })
         details = PayDetails.objects.get()
         self.assertEqual(details.ni_number, "AB123456C")
@@ -229,6 +231,7 @@ class MyPayslipsTests(ApiBase):
             employee=self.emp_b, store=self.store_b, clock_in_at=when(MON, "09:00"), clock_out_at=when(MON, "17:00")
         )
         services.add_rate(self.hr, self.emp_b, Decimal("11.00"), MON)
+        services.set_pay_details(self.hr, self.emp_b, {"date_of_birth": date(2007, 6, 1)})
         services.fill_run(self.run)
         self.approve()
         theirs = self.slip(self.run, self.emp_b)

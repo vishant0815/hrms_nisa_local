@@ -187,4 +187,9 @@ PAYROLL_ENCRYPTION_KEY = os.environ.get("PAYROLL_ENCRYPTION_KEY", "")
 if "test" in sys.argv and not PAYROLL_ENCRYPTION_KEY:
     PAYROLL_ENCRYPTION_KEY = "dGVzdC1vbmx5LWtleS10ZXN0LW9ubHkta2V5LTAwMDA="  # tests only
 # Clocked time longer than the rostered shift by more than this needs a manager's OK before it is paid.
+# "net_pay": pension comes off pay before tax. "relief_at_source": tax is worked out on full pay and the pension
+# provider claims the basic-rate relief, so only 80% of the contribution is taken. Ask the pension provider.
+PAYROLL_PENSION_TAX_METHOD = os.environ.get("PAYROLL_PENSION_TAX_METHOD", "net_pay")
+# Pay multiplier for hours worked on a bank holiday. 1 = normal pay (the law does not require more).
+PAYROLL_BANK_HOLIDAY_MULTIPLIER = os.environ.get("PAYROLL_BANK_HOLIDAY_MULTIPLIER", "1")
 PAYROLL_EXTRA_HOURS_TOLERANCE_MINUTES = int(os.environ.get("PAYROLL_EXTRA_HOURS_TOLERANCE_MINUTES", "15"))
