@@ -48,6 +48,35 @@ class SeedTests(TermLetterBase):
         self.assertEqual(flagged, {"Student"})
 
 
+class UploadScanningTests(TermLetterBase):
+    def test_an_infected_letter_is_refused_and_nothing_is_stored(self):
+        from apps.core.test_scanning import FakeClamd, settings_for
+
+        fake = FakeClamd()
+        with settings_for(fake.port):
+            response = self.post_letter(file=upload(b"%PDF-1.4 EICAR-STANDARD-ANTIVIRUS-TEST-FILE"))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("virus", json.dumps(response.data))
+        self.assertEqual(TermLetter.objects.count(), 0)
+
+    def test_a_clean_letter_passes_through_the_scanner(self):
+        from apps.core.test_scanning import FakeClamd, settings_for
+
+        fake = FakeClamd()
+        with settings_for(fake.port):
+            response = self.post_letter(file=upload(b"%PDF-1.4 clean"))
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(fake.received, b"%PDF-1.4 clean")
+
+    def test_with_the_scanner_down_the_upload_is_refused_not_stored_unchecked(self):
+        from django.test import override_settings
+
+        with override_settings(UPLOAD_SCANNING="clamd", CLAMAV_HOST="127.0.0.1", CLAMAV_PORT=1, CLAMAV_TIMEOUT=1):
+            response = self.post_letter()
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(TermLetter.objects.count(), 0)
+
+
 class UploadTests(TermLetterBase):
     def test_student_can_upload_pdf_png_and_jpeg(self):
         for content in (b"%PDF-1.7 hello", PNG, JPEG):

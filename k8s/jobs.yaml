@@ -1,0 +1,24 @@
+# One-off job to run before each new version starts: apply database changes.
+# Delete the finished job before applying again (or let your pipeline do it): kubectl -n hrms delete job hrms-migrate
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hrms-migrate
+  namespace: hrms
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: hrms-backend:latest   # CHANGE to the same image as the backend
+          command: ["python", "manage.py", "migrate", "--noinput"]
+          envFrom:
+            - configMapRef: {name: hrms-config}
+            - secretRef: {name: hrms-secrets}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}

@@ -44,6 +44,14 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
 
+  # Virus scanner for uploads. Only needed with UPLOAD_SCANNING=clamd (always the case outside DEBUG):
+  #   docker compose --profile scan up
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["scan"]
+    ports:
+      - "3310:3310"
+
   backend:
     build: ./backend
     command: >

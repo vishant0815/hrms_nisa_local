@@ -1,0 +1,53 @@
+# The Django API (everything under /api/ except /api/clock/).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: hrms
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: backend}
+  template:
+    metadata:
+      labels: {app: backend}
+    spec:
+      securityContext: {fsGroup: 10001}   # so the non-root user can write to the shared volume
+      containers:
+        - name: backend
+          image: hrms-backend:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: {name: hrms-config}
+            - secretRef: {name: hrms-secrets}
+          readinessProbe:
+            httpGet: {path: /api/health/, port: 8000, httpHeaders: [{name: Host, value: hr.example.com}]}  # CHANGE: must be in DJANGO_ALLOWED_HOSTS
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /api/health/, port: 8000, httpHeaders: [{name: Host, value: hr.example.com}]}
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: {cpu: 200m, memory: 384Mi}
+            limits: {memory: 768Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: private-media, mountPath: /data/private_media}
+      volumes:
+        - name: private-media
+          persistentVolumeClaim: {claimName: private-media}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: hrms
+spec:
+  selector: {app: backend}
+  ports:
+    - port: 8000
+      targetPort: 8000

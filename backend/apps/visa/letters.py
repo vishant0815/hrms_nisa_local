@@ -2,7 +2,7 @@
 
 Uploaded files are untrusted. The type is decided by reading the file's first bytes (not its
 name or the type the browser claims), the size is capped, and the stored name is random.
-There is no virus scanning here; add one (e.g. ClamAV) before going live.
+Every file is also scanned with ClamAV (apps/core/scanning.py) before it is stored.
 """
 import re
 import uuid
@@ -10,6 +10,8 @@ import uuid
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
+
+from apps.core import scanning
 
 from . import alerts, reading
 from .models import EmployeeVisa, LetterStatus, TermLetter, VacationPeriod
@@ -61,6 +63,7 @@ def upload_letter(*, employee, user, upload, institution=""):
         raise ValidationError({"file": "Upload a PDF, JPEG or PNG file."})
     if TermLetter.objects.filter(visa=visa, status=LetterStatus.PENDING).count() >= MAX_PENDING:
         raise ValidationError("You already have letters waiting for HR to check. Please wait for those first.")
+    scanning.scan_upload(upload, "letter")
 
     original = clean_filename(upload.name)
     upload.name = f"{uuid.uuid4().hex}{FILE_TYPES[content_type][0]}"

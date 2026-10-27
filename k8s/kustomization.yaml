@@ -1,0 +1,14 @@
+# kubectl apply -k k8s/   (after creating hrms-secrets from secret.example.yaml)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - config.yaml
+  - storage.yaml
+  - clamav.yaml
+  - backend.yaml
+  - attendance-api.yaml
+  - notifications.yaml
+  - cronjobs.yaml
+  - ingress.yaml
+# jobs.yaml (the migration job) is applied separately before each release; see docs/deployment.md.

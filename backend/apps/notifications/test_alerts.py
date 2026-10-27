@@ -148,7 +148,7 @@ class AttendanceEmailTests(AttendanceBase):
         self.assertEqual(queued("attendance_review"), ["mgr-a@example.com"])
         send_everything()
         body = inbox("mgr-a@example.com")[0].body
-        self.assertIn("EMP-0001", body)
+        self.assertIn(self.emp_a.employee_number, body)
         self.assertIn("Clocked away from the shop.", body)
         self.assertIn("Shop A", body)
 
@@ -194,7 +194,7 @@ class TermLetterEmailTests(TermLetterBase):
         self.assertEqual(queued("term_letter_uploaded"), ["hr@example.com", "owner@example.com"])
         send_everything()
         self.assertEqual(inbox("mgr-a@example.com"), [])
-        self.assertIn("EMP-0001", inbox("hr@example.com")[0].body)
+        self.assertIn(self.employee.employee_number, inbox("hr@example.com")[0].body)
 
     def test_the_student_hears_the_outcome_and_the_reason(self):
         accepted = self.pending_letter()
@@ -225,7 +225,7 @@ class VisaDigestTests(VisaTestBase):
         send_everything()
         body = inbox("hr@example.com")[0].body
         self.assertIn("Skilled Worker", body)
-        self.assertIn("EMP-0001", body)
+        self.assertIn(self.employee.employee_number, body)
         self.assertEqual(inbox("mgr-a@example.com"), [])
         self.assertEqual(inbox("emp@example.com"), [])
 

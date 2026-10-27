@@ -1,0 +1,169 @@
+# Monday morning: build last week's pay run as a draft and tell Owner and HR.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: create-weekly-pay-run
+  namespace: hrms
+spec:
+  schedule: "30 6 * * 1"
+  timeZone: "Europe/London"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: job
+              image: hrms-backend:latest   # CHANGE to the same image as the backend
+              command: ["python", "manage.py", "create_weekly_pay_run"]
+              envFrom:
+                - configMapRef: {name: hrms-config}
+                - secretRef: {name: hrms-secrets}
+              resources:
+                requests: {cpu: 50m, memory: 192Mi}
+                limits: {memory: 384Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities: {drop: ["ALL"]}
+---
+# Every hour on Thursday: email payslips for approved runs whose pay date has come. Safe to run often, never sends twice.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: send-payslips
+  namespace: hrms
+spec:
+  schedule: "5 * * * 4"
+  timeZone: "Europe/London"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: job
+              image: hrms-backend:latest   # CHANGE to the same image as the backend
+              command: ["python", "manage.py", "send_payslips"]
+              envFrom:
+                - configMapRef: {name: hrms-config}
+                - secretRef: {name: hrms-secrets}
+              resources:
+                requests: {cpu: 50m, memory: 192Mi}
+                limits: {memory: 384Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities: {drop: ["ALL"]}
+---
+# Daily: warn about visas and right-to-work checks that are about to expire.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: visa-expiry-check
+  namespace: hrms
+spec:
+  schedule: "15 7 * * *"
+  timeZone: "Europe/London"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: job
+              image: hrms-backend:latest   # CHANGE to the same image as the backend
+              command: ["python", "manage.py", "check_visa_expiry"]
+              envFrom:
+                - configMapRef: {name: hrms-config}
+                - secretRef: {name: hrms-secrets}
+              resources:
+                requests: {cpu: 50m, memory: 192Mi}
+                limits: {memory: 384Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities: {drop: ["ALL"]}
+---
+# Weekdays: one list of expiring statuses for Owner and HR.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: visa-expiry-digest
+  namespace: hrms
+spec:
+  schedule: "30 7 * * 1-5"
+  timeZone: "Europe/London"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: job
+              image: hrms-backend:latest   # CHANGE to the same image as the backend
+              command: ["python", "manage.py", "send_visa_expiry_digest"]
+              envFrom:
+                - configMapRef: {name: hrms-config}
+                - secretRef: {name: hrms-secrets}
+              resources:
+                requests: {cpu: 50m, memory: 192Mi}
+                limits: {memory: 384Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities: {drop: ["ALL"]}
+---
+# Daily: clear raw GPS coordinates older than the retention period.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: purge-attendance-locations
+  namespace: hrms
+spec:
+  schedule: "45 3 * * *"
+  timeZone: "Europe/London"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: job
+              image: hrms-backend:latest   # CHANGE to the same image as the backend
+              command: ["python", "manage.py", "purge_attendance_locations"]
+              envFrom:
+                - configMapRef: {name: hrms-config}
+                - secretRef: {name: hrms-secrets}
+              resources:
+                requests: {cpu: 50m, memory: 192Mi}
+                limits: {memory: 384Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities: {drop: ["ALL"]}

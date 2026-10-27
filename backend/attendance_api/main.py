@@ -12,6 +12,7 @@ The time of a clock event is always the server's. Anything a phone says about ti
 """
 import os
 from datetime import datetime
+from functools import wraps
 from typing import Literal, Optional
 
 import django
@@ -35,6 +36,24 @@ from apps.fingerprint import services as fingerprint  # noqa: E402
 
 app = FastAPI(title="HRMS clock service", docs_url=None, redoc_url=None, openapi_url=None)
 bearer = HTTPBearer(auto_error=False)
+
+
+def tidy(handler):
+    """Give the database connection back when the request is done.
+
+    Requests run in a pool of worker threads and each thread keeps its own Django connection. Without this a
+    connection stays open until that thread happens to serve another request.
+    """
+
+    @wraps(handler)
+    def inner(*args, **kwargs):
+        close_old_connections()
+        try:
+            return handler(*args, **kwargs)
+        finally:
+            close_old_connections()
+
+    return inner
 
 
 class Problem(Exception):
@@ -111,22 +130,22 @@ def health():
 
 
 @app.post("/clock/in", status_code=201)
+@tidy
 def clock_in(where: Location, employee: EmployeeProfile = Depends(current_employee)):
-    close_old_connections()
     record = services.clock_in(employee=employee, **where.as_kwargs())
     return result(record, "You are clocked in.")
 
 
 @app.post("/clock/out")
+@tidy
 def clock_out(where: Location, employee: EmployeeProfile = Depends(current_employee)):
-    close_old_connections()
     record = services.clock_out(employee=employee, **where.as_kwargs())
     return result(record, "You are clocked out.")
 
 
 @app.get("/clock/status")
+@tidy
 def clock_status(employee: EmployeeProfile = Depends(current_employee)):
-    close_old_connections()
     record = services.open_record(employee)
     if record is None:
         return {"clocked_in": False}
@@ -185,16 +204,16 @@ def punch_result(punch):
 
 
 @app.post("/clock/device/punch")
+@tidy
 def device_punch(body: DevicePunch, device=Depends(current_device)):
-    close_old_connections()
     punch = fingerprint.process_punch(device=device, user_id=body.user_id, kind=body.kind, device_time=body.time)
     return punch_result(punch)
 
 
 @app.post("/clock/device/punches")
+@tidy
 def device_punches(body: DevicePunchBatch, device=Depends(current_device)):
     """Punches a device held while it was offline. Handled oldest first."""
-    close_old_connections()
     results = []
     for item in sorted(body.punches, key=lambda p: p.time):
         punch = fingerprint.process_punch(device=device, user_id=item.user_id, kind=item.kind, device_time=item.time)
@@ -203,8 +222,8 @@ def device_punches(body: DevicePunchBatch, device=Depends(current_device)):
 
 
 @app.post("/clock/device/heartbeat")
+@tidy
 def device_heartbeat(body: DeviceHeartbeat, device=Depends(current_device)):
     """Lets managers see the device is online and whether its clock is right."""
-    close_old_connections()
     fingerprint.note_contact(device, body.time, fingerprint.attendance.current_time())
     return {"status": "ok"}
