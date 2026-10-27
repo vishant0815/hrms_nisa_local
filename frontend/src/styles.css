@@ -1,0 +1,147 @@
+/* Nisa Local staff portal.
+   Palette comes from the shop floor: the cool grey of a chiller cabinet, shelf-edge ticket yellow, signage navy,
+   and a red kept for the things that need attention. One typeface, Archivo, used wide and heavy for signage-style
+   headings and at normal width for reading. */
+
+:root {
+  --chiller: #e8eef1;
+  --paper: #f8fafb;
+  --ink: #12202c;
+  --ink-soft: #46586a;
+  --line: #c5d1d8;
+  --ticket: #ffe14d;
+  --ticket-deep: #f2c900;
+  --alert: #b3112a;
+  --ok: #17704a;
+  --focus: #0b5fff;
+  --radius: 4px;
+  font-family: "Archivo Variable", system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--chiller);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chiller: #0d1620;
+    --paper: #15222f;
+    --ink: #eef3f6;
+    --ink-soft: #9fb1c0;
+    --line: #2b3d4d;
+    --ticket: #ffe14d;
+    --ticket-deep: #f2c900;
+    --alert: #ff8a98;
+    --ok: #6bd6a3;
+    --focus: #7fb0ff;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--chiller); }
+
+h1, h2 { font-stretch: 112%; font-weight: 800; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 1.9rem; margin: 1.5rem 0 1rem; }
+h2 { font-size: 1.15rem; margin-bottom: 0.6rem; }
+p { margin: 0 0 0.6rem; max-width: 62ch; }
+a { color: var(--ink); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* Buttons */
+button { font: inherit; cursor: pointer; border-radius: var(--radius); min-height: 44px; padding: 0 1.1rem; border: 2px solid var(--ink); background: transparent; color: var(--ink); font-weight: 600; }
+button:disabled { opacity: 0.55; cursor: progress; }
+button.primary { background: var(--ticket); border-color: var(--ink); color: #12202c; font-weight: 800; box-shadow: 0 3px 0 var(--ink); }
+button.primary:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+button.primary.big { min-height: 56px; font-size: 1.15rem; padding: 0 1.8rem; }
+button.quiet { border-color: var(--line); font-weight: 500; min-height: 40px; }
+button.quiet:hover:not(:disabled) { border-color: var(--ink); }
+
+/* Forms */
+label { display: block; font-weight: 600; margin-bottom: 0.9rem; }
+input, select { display: block; width: 100%; margin-top: 0.25rem; min-height: 44px; padding: 0.4rem 0.7rem; font: inherit; font-weight: 400; color: var(--ink); background: var(--paper); border: 2px solid var(--line); border-radius: var(--radius); }
+input:focus, select:focus { border-color: var(--ink); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+@media (max-width: 560px) { .two { grid-template-columns: 1fr; } }
+
+/* Messages */
+.problem { color: var(--alert); font-weight: 600; }
+.note { color: var(--ok); font-weight: 600; }
+.empty, .hint, .lede { color: var(--ink-soft); }
+.splash { padding: 3rem 1rem; text-align: center; }
+.skip { position: absolute; left: -999px; }
+.skip:focus { left: 0.5rem; top: 0.5rem; background: var(--ticket); padding: 0.5rem 0.8rem; z-index: 5; }
+
+/* Page frame */
+.shell { min-height: 100vh; }
+.topbar { background: var(--ink); color: #eef3f6; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.4rem; padding: 0.7rem 1rem; }
+.topbar .brand { font-stretch: 125%; font-weight: 800; font-size: 1.1rem; color: var(--ticket); }
+.topbar nav { display: flex; gap: 0.2rem; flex: 1; }
+.topbar nav a { color: #eef3f6; text-decoration: none; padding: 0.45rem 0.8rem; border-radius: var(--radius); font-weight: 600; }
+.topbar nav a:hover { background: rgba(255, 255, 255, 0.12); }
+.topbar nav a.active { background: var(--ticket); color: #12202c; }
+.who { display: flex; align-items: center; gap: 0.8rem; font-weight: 600; }
+.who small { display: block; font-weight: 400; opacity: 0.8; line-height: 1.2; }
+.who button.quiet { border-color: rgba(255, 255, 255, 0.4); color: #eef3f6; }
+.who button.quiet:hover { border-color: #fff; }
+main { max-width: 56rem; margin: 0 auto; padding: 0.5rem 1rem 3rem; }
+@media (max-width: 640px) {
+  .who span { display: none; }
+  .topbar .brand { order: 1; flex: 1; }
+  .topbar .who { order: 2; }
+  .topbar nav { order: 3; flex-basis: 100%; }
+}
+
+/* Panels are plain surfaces separated by a rule, not a grid of identical cards. */
+.panel { background: var(--paper); border: 1px solid var(--line); border-left: 6px solid var(--ink); border-radius: var(--radius); padding: 1rem 1.2rem; margin-bottom: 1rem; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+@media (max-width: 640px) { .pair { grid-template-columns: 1fr; } }
+.figure { font-size: 1rem; margin-bottom: 0.2rem; }
+.figure strong { font-stretch: 112%; font-size: 2rem; font-weight: 800; }
+.hello { font-size: 2.2rem; }
+
+/* The clock: the one thing most people open the page to do, so it is the biggest thing on it. */
+.clock { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.8rem 1.5rem; background: var(--paper); border: 2px solid var(--ink); border-radius: var(--radius); padding: 1.1rem 1.3rem; margin-bottom: 1rem; }
+.clock.on { background: var(--ink); color: #eef3f6; }
+.clock.on .note { color: var(--ticket); }
+.clock p { margin: 0.1rem 0 0; }
+.clock .note, .clock .problem { flex-basis: 100%; }
+
+/* Shift tickets: shelf-edge price tags. */
+.tickets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 0.8rem; }
+.ticket { display: grid; gap: 0.1rem; padding: 0.7rem 0.9rem 0.8rem 1.3rem; background: var(--ticket); color: #12202c; border: 2px solid #12202c; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); position: relative; }
+.ticket::before { content: ""; position: absolute; left: 0.45rem; top: 50%; width: 0.5rem; height: 0.5rem; margin-top: -0.25rem; border-radius: 50%; background: var(--chiller); border: 2px solid #12202c; }
+.ticket time { font-weight: 700; }
+.ticket strong { font-stretch: 112%; font-weight: 800; font-size: 1.45rem; line-height: 1.1; white-space: nowrap; }
+.ticket span { font-weight: 500; }
+.ticket small { font-size: 0.9rem; font-weight: 600; opacity: 0.8; }
+.ticket.today { background: #12202c; color: var(--ticket); border-color: var(--ticket); }
+.ticket.today::before { background: var(--ticket); border-color: var(--ticket); }
+
+/* Lists of things (leave requests, payslips) are ruled rows. */
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.4rem 1rem; padding: 0.8rem 0; border-top: 1px solid var(--line); }
+.rows li:first-child { border-top: 0; }
+.rows li div { display: grid; gap: 0.1rem; }
+.rows .side { justify-items: end; text-align: right; }
+.rows em { color: var(--ink-soft); }
+.state { font-weight: 700; }
+.state.approved { color: var(--ok); }
+.state.rejected { color: var(--alert); }
+.state.cancelled { color: var(--ink-soft); }
+
+/* Sign in */
+.signin { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; max-width: none; padding: 0; margin: 0; }
+.signin-sign { background: var(--ink); color: #eef3f6; padding: 3rem; display: flex; flex-direction: column; justify-content: center; }
+.signin-sign h1 { margin: 0 0 0.6rem; font-size: 3rem; font-stretch: 125%; color: var(--ticket); }
+.signin-form { padding: 3rem; align-self: center; max-width: 26rem; width: 100%; }
+.signin-form h2 { font-size: 1.5rem; margin-bottom: 1.2rem; }
+.signin-form .hint { margin-top: 1rem; }
+@media (max-width: 760px) {
+  .signin { grid-template-columns: 1fr; min-height: 0; }
+  .signin-sign { padding: 1.6rem 1rem; }
+  .signin-sign h1 { font-size: 2rem; }
+  .signin-form { padding: 1.5rem 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
