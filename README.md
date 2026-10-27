@@ -35,7 +35,7 @@ backend/            Django + DRF (accounts, stores, employees, visa, rota, leave
 fastapi_service/    Attendance and fraud checks
 kafka_consumers/    Email notifications and audit logging
 frontend/           Website
-k8s/                Kubernetes manifests
+k8s/                Kubernetes manifests (see docs/deployment.md)
 docker-compose.yml  Local development stack
 ```
 

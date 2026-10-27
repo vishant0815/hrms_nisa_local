@@ -1,0 +1,61 @@
+# The clock-in / clock-out service (FastAPI): the busiest endpoint, so it scales on its own.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: attendance-api
+  namespace: hrms
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: attendance-api}
+  template:
+    metadata:
+      labels: {app: attendance-api}
+    spec:
+      containers:
+        - name: attendance-api
+          image: hrms-backend:latest
+          command: ["uvicorn","attendance_api.main:app","--host","0.0.0.0","--port","8001"]
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - configMapRef: {name: hrms-config}
+            - secretRef: {name: hrms-secrets}
+          readinessProbe:
+            httpGet: {path: /health, port: 8001}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /health, port: 8001}
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {memory: 384Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: attendance-api
+  namespace: hrms
+spec:
+  selector: {app: attendance-api}
+  ports:
+    - port: 8001
+      targetPort: 8001
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: attendance-api
+  namespace: hrms
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: attendance-api}
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}

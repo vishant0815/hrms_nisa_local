@@ -204,7 +204,7 @@ class MinimumWageTests(DeductionBase):
         services.add_rate(self.hr, self.emp_b, D("5.00"), MON)
         self.rec(1, "09:00", "17:00", who=self.emp_b)
         problems = services.blockers(self.run_for())
-        self.assertTrue(any("EMP-0002" in p and "no date of birth" in p for p in problems), problems)
+        self.assertTrue(any(self.emp_b.employee_number in p and "no date of birth" in p for p in problems), problems)
 
     def test_a_rate_for_a_year_with_no_figures_yet_is_accepted_and_checked_later(self):
         services.add_rate(self.hr, self.worker, D("13.00"), date(2027, 4, 6))

@@ -1,0 +1,62 @@
+# Virus scanner for uploads. The backend refuses uploads whenever this is not answering.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clamav
+  namespace: hrms
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: clamav}
+  template:
+    metadata:
+      labels: {app: clamav}
+    spec:
+      containers:
+        - name: clamav
+          image: clamav/clamav:1.4
+          ports:
+            - containerPort: 3310
+          resources:
+            requests: {cpu: 200m, memory: 1536Mi}
+            limits: {memory: 3Gi}
+          # It downloads virus definitions on first start, which takes a few minutes.
+          startupProbe:
+            tcpSocket: {port: 3310}
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: {port: 3310}
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: {port: 3310}
+            periodSeconds: 30
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clamav
+  namespace: hrms
+spec:
+  selector: {app: clamav}
+  ports:
+    - port: 3310
+      targetPort: 3310
+---
+# Only the web app pods may talk to the scanner.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clamav-only-from-backend
+  namespace: hrms
+spec:
+  podSelector:
+    matchLabels: {app: clamav}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: backend}
+      ports:
+        - port: 3310

@@ -1,0 +1,13 @@
+# Payslip PDFs and uploaded letters. The web app writes them, the email consumer reads them, so every pod that
+# mounts this must see the same files: use a storage class that supports ReadWriteMany (NFS, EFS, Azure Files...).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: private-media
+  namespace: hrms
+spec:
+  accessModes: ["ReadWriteMany"]
+  # storageClassName: CHANGE-to-your-RWX-class
+  resources:
+    requests:
+      storage: 5Gi

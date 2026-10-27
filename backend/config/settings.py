@@ -189,6 +189,22 @@ if "test" in sys.argv and not PAYROLL_ENCRYPTION_KEY:
 # Clocked time longer than the rostered shift by more than this needs a manager's OK before it is paid.
 # "net_pay": pension comes off pay before tax. "relief_at_source": tax is worked out on full pay and the pension
 # provider claims the basic-rate relief, so only 80% of the contribution is taken. Ask the pension provider.
+# Virus scanning of uploads through ClamAV. On unless DEBUG; if the scanner is down uploads are refused.
+_TESTING = "test" in sys.argv
+UPLOAD_SCANNING = os.environ.get("UPLOAD_SCANNING", "off" if (DEBUG or _TESTING) else "clamd")
+if not (DEBUG or _TESTING) and UPLOAD_SCANNING != "clamd":
+    raise RuntimeError("UPLOAD_SCANNING must be 'clamd' unless DJANGO_DEBUG is true")
+CLAMAV_HOST = os.environ.get("CLAMAV_HOST", "clamav")
+CLAMAV_PORT = int(os.environ.get("CLAMAV_PORT", "3310"))
+CLAMAV_TIMEOUT = float(os.environ.get("CLAMAV_TIMEOUT", "15"))
+
+# Behind the ingress, which ends HTTPS: trust its header, and keep cookies off plain HTTP.
+if not (DEBUG or _TESTING):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+
 PAYROLL_PENSION_TAX_METHOD = os.environ.get("PAYROLL_PENSION_TAX_METHOD", "net_pay")
 # Pay multiplier for hours worked on a bank holiday. 1 = normal pay (the law does not require more).
 PAYROLL_BANK_HOLIDAY_MULTIPLIER = os.environ.get("PAYROLL_BANK_HOLIDAY_MULTIPLIER", "1")

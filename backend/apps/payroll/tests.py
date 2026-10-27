@@ -173,6 +173,20 @@ class LogoTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("logo", response.json())
 
+    def test_an_infected_logo_is_refused_and_the_scanner_being_down_refuses_too(self):
+        from django.test import override_settings
+
+        from apps.core.test_scanning import FakeClamd, settings_for
+
+        self.upload(picture("PNG"))
+        kept = PayslipTemplate.current().logo.name
+        fake = FakeClamd(answer=b"stream: Win.Test.EICAR_HDB-1 FOUND")
+        with settings_for(fake.port):
+            self.assertEqual(self.upload(picture("PNG")).status_code, 400)
+        with override_settings(UPLOAD_SCANNING="clamd", CLAMAV_HOST="127.0.0.1", CLAMAV_PORT=1, CLAMAV_TIMEOUT=1):
+            self.assertEqual(self.upload(picture("PNG")).status_code, 503)
+        self.assertEqual(PayslipTemplate.current().logo.name, kept)
+
     def test_a_failed_upload_keeps_the_old_logo(self):
         self.upload(picture("PNG"))
         kept = PayslipTemplate.current().logo.name

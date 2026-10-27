@@ -11,6 +11,7 @@ from PIL import Image, UnidentifiedImageError
 from rest_framework.exceptions import ValidationError
 
 from apps.attendance.models import AttendanceRecord
+from apps.core import scanning
 from apps.employees.models import EmployeeProfile
 
 from . import attachments, calc, crypto, deductions, minwage, pdf, rules, taxrates
@@ -47,6 +48,7 @@ def check_logo(raw: bytes):
 
 def set_logo(user, raw: bytes):
     content_type, extension = check_logo(raw)
+    scanning.scan(raw, "logo")
     template = PayslipTemplate.current()
     if template.logo:
         template.logo.delete(save=False)
