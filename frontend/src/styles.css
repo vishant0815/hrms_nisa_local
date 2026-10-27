@@ -145,3 +145,25 @@ main { max-width: 56rem; margin: 0 auto; padding: 0.5rem 1rem 3rem; }
 }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Payroll */
+.crumb { margin: 1.2rem 0 0; }
+.summary .actions, .editor .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0.8rem 0; }
+.blockers { border: 2px solid var(--alert); border-radius: var(--radius); padding: 0.8rem 1rem; margin: 0.8rem 0; }
+.blockers h2 { color: var(--alert); font-size: 1rem; }
+.blockers ul, .problem ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+.confirm { border: 2px solid var(--ink); border-radius: var(--radius); padding: 0.8rem 1rem; background: var(--chiller); margin: 0.6rem 0; }
+.slips { list-style: none; margin: 0; padding: 0; }
+.slips > li { border-top: 1px solid var(--line); }
+.slips > li:first-child { border-top: 0; }
+.slip-head { width: 100%; display: grid; grid-template-columns: 2fr 0.8fr 1.2fr 1.2fr 1.4fr; gap: 0.5rem 1rem; align-items: center; text-align: left; border: 0; border-radius: 0; min-height: 56px; padding: 0.5rem 0; font-weight: 500; }
+.slip-head:hover { background: var(--chiller); }
+.who-slip small { display: block; font-weight: 400; color: var(--ink-soft); }
+@media (max-width: 700px) { .slip-head { grid-template-columns: 1fr 1fr; } .slip-head .who-slip { grid-column: 1 / -1; } }
+.slip-body { padding: 0.4rem 0 1rem 0.2rem; }
+.editor h3 { font-size: 1rem; margin: 1rem 0 0.4rem; font-stretch: 112%; }
+.plain { list-style: none; margin: 0; padding: 0; }
+.plain li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.3rem 0; border-top: 1px solid var(--line); }
+.plain li:first-child { border-top: 0; }
+.money-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0 1rem; }
+.notice { background: var(--ticket); color: #12202c; border: 2px solid #12202c; border-radius: var(--radius); padding: 0.6rem 0.9rem; margin: 0.8rem 0; max-width: none; }

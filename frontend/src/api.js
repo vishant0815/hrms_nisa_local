@@ -33,7 +33,8 @@ export class ApiError extends Error {
 // the clock service sends {"code": "...", "message": "..."}. Turn either into one sentence for the screen.
 export function errorText(data, fallback = "Something went wrong. Please try again.") {
   if (!data) return fallback;
-  if (typeof data === "string") return data;
+  // A crash page from the server is HTML; never show that to a person.
+  if (typeof data === "string") return /<\w+/.test(data) || data.length > 300 ? fallback : data;
   if (typeof data.message === "string") return data.message;
   if (typeof data.detail === "string") return data.detail;
   const parts = [];
@@ -93,7 +94,13 @@ export async function api(path, options = {}) {
   }
   if (options.blob && response.ok) return response.blob();
   const data = await parse(response);
-  if (!response.ok) throw new ApiError(errorText(data), response.status, data);
+  if (!response.ok) {
+    const message =
+      response.status >= 500
+        ? "The server had a problem. Try again in a moment. If it keeps happening, tell whoever looks after the system."
+        : errorText(data);
+    throw new ApiError(message, response.status, data);
+  }
   return data;
 }
 

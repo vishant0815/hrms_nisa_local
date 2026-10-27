@@ -54,3 +54,19 @@ export function period(days) {
   const dates = days.map((d) => d.date).sort();
   return `${shortDay(dates[0])} to ${shortDay(dates[dates.length - 1])}`;
 }
+
+// Minutes as "38h 50m" for pay hours.
+export function minutesText(total) {
+  const m = Number(total) || 0;
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  if (!h) return `${rest}m`;
+  return rest ? `${h}h ${rest}m` : `${h}h`;
+}
+
+// The Monday on or before a date, as "2026-10-19".
+export function mondayOf(iso) {
+  const date = toDate(iso);
+  const back = (date.getDay() + 6) % 7;
+  return addDays(iso, -back);
+}

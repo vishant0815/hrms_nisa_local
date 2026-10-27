@@ -59,3 +59,15 @@ describe("sign in page", () => {
     expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
   });
 });
+
+import { slipState } from "../pages/PayRun.jsx";
+describe("payslip state", () => {
+  const slip = (extra) => ({ held: [], sick_dates: {}, sick_pay: "0.00", gross_pay: "100.00", deductions_confirmed: true, ...extra });
+  it("asks for the thing that is missing, most urgent first", () => {
+    expect(slipState(slip({ held: [{}] })).text).toBe("1 held");
+    expect(slipState(slip({ sick_dates: { 7: ["2026-10-21"] } })).text).toBe("Enter sick pay");
+    expect(slipState(slip({ deductions_confirmed: false })).text).toBe("Check and confirm");
+    expect(slipState(slip()).text).toBe("Ready");
+    expect(slipState(slip({ gross_pay: "0.00", deductions_confirmed: false })).text).toBe("Ready");
+  });
+});

@@ -31,9 +31,11 @@ export default function Home() {
         <section className="panel">
           <h2>No staff record on this account</h2>
           <p>
-            This account is not set up as a member of staff, so there is no rota, clock or payslip to show. The screens for
-            running the shops (people, rotas, attendance, payroll) are being added next.
+            This account is not set up as a member of staff, so there is no rota, clock or payslip to show.
+            {(user.role === "owner" || user.role === "hr") && " Pay runs are under Payroll."} The other screens for running
+            the shops (people, rotas, attendance) are being added next.
           </p>
+          {(user.role === "owner" || user.role === "hr") && <Link to="/payroll">Go to payroll</Link>}
         </section>
       ) : (
         <>

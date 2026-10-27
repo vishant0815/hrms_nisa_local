@@ -17,9 +17,19 @@ describe("errorText", () => {
     expect(errorText({ code: "no_shift", message: "You are not rostered to work right now." })).toBe("You are not rostered to work right now.");
     expect(errorText({ problems: ["EMP-0001 is below the minimum wage."] })).toBe("EMP-0001 is below the minimum wage.");
   });
+  it("never shows a server crash page", () => {
+    expect(errorText("<!DOCTYPE html><html><title>Error</title></html>")).toMatch(/try again/i);
+  });
   it("never shows nothing", () => {
     expect(errorText(null)).toMatch(/try again/i);
     expect(errorText({})).toMatch(/try again/i);
+  });
+});
+
+describe("server problems", () => {
+  it("says there was a problem instead of showing the error page", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(new Response("<html><body>Traceback…</body></html>", { status: 500 }))));
+    await expect(api("/pay-runs/")).rejects.toThrow(/server had a problem/);
   });
 });
 

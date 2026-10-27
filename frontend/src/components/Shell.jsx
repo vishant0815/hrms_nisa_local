@@ -5,6 +5,7 @@ const LINKS = [
   { to: "/", label: "Home", end: true },
   { to: "/leave", label: "Leave" },
   { to: "/payslips", label: "Payslips" },
+  { to: "/payroll", label: "Payroll", roles: ["owner", "hr"] },
 ];
 
 export default function Shell({ children }) {
@@ -18,7 +19,7 @@ export default function Shell({ children }) {
         </a>
         <span className="brand">Nisa Local</span>
         <nav aria-label="Main">
-          {LINKS.map((link) => (
+          {LINKS.filter((link) => !link.roles || link.roles.includes(user.role)).map((link) => (
             <NavLink key={link.to} to={link.to} end={link.end}>
               {link.label}
             </NavLink>
