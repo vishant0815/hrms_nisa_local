@@ -99,3 +99,37 @@ class ScanningTests(SimpleTestCase):
         with settings_for(fake.port):
             scanning.scan_upload(upload)
         self.assertEqual(upload.read(), b"%PDF-1.4 hello")
+
+
+import gzip  # noqa: E402
+import os  # noqa: E402
+import zlib  # noqa: E402
+from unittest import skipUnless  # noqa: E402
+
+CLAMAV = os.environ.get("HRMS_TEST_CLAMAV", "")  # host:port of a real clamd, for example 127.0.0.1:3310
+EICAR = rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"  # the harmless standard test file
+
+
+@skipUnless(CLAMAV, "set HRMS_TEST_CLAMAV=host:port to run these against a real ClamAV")
+class RealClamavTests(SimpleTestCase):
+    def real(self):
+        host, port = CLAMAV.rsplit(":", 1)
+        return override_settings(UPLOAD_SCANNING="clamd", CLAMAV_HOST=host, CLAMAV_PORT=int(port), CLAMAV_TIMEOUT=30)
+
+    def pdf_carrying_the_test_file(self):
+        stream = zlib.compress(EICAR)
+        return (
+            b"%PDF-1.4\n1 0 obj\n<< /Length " + str(len(stream)).encode() + b" /Filter /FlateDecode >>\nstream\n"
+            + stream + b"\nendstream\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n"
+        )
+
+    def test_clean_files_pass_including_one_larger_than_a_chunk(self):
+        with self.real():
+            scanning.scan(b"%PDF-1.4 an ordinary file")
+            scanning.scan(b"\x89PNG\r\n\x1a\n" + os.urandom(3_000_000))
+
+    def test_the_standard_test_file_is_found_plain_and_inside_a_pdf_or_archive(self):
+        with self.real():
+            for name, data in (("plain", EICAR), ("in a pdf", self.pdf_carrying_the_test_file()), ("gzipped", gzip.compress(EICAR))):
+                with self.subTest(name), self.assertRaises(ValidationError):
+                    scanning.scan(data)
