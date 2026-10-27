@@ -1,5 +1,5 @@
-# Routing for an nginx ingress controller. The longer path wins, so /api/clock/ goes to the clock service and
-# the rest of /api/ to Django. TLS needs a certificate secret (for example from cert-manager).
+# Routing for an nginx ingress controller. /api/clock/... goes to the clock service (second Ingress below, which
+# strips the /api prefix because that service serves /clock/...) and the rest of /api/ to Django. TLS needs a certificate secret (for example from cert-manager).
 # The website itself is not here yet: when the frontend exists, add a "/" path pointing at its service.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -18,11 +18,33 @@ spec:
     - host: hr.example.com                                   # CHANGE
       http:
         paths:
-          - path: /api/clock/
-            pathType: Prefix
-            backend:
-              service: {name: attendance-api, port: {number: 8001}}
           - path: /api/
             pathType: Prefix
             backend:
               service: {name: backend, port: {number: 8000}}
+---
+# The clock service serves /clock/in, /clock/out and so on, so /api/clock/X is rewritten to /clock/X. A regex path
+# is matched before the plain /api/ prefix above, so this wins for clock requests.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hrms-clock
+  namespace: hrms
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /clock/$1
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["hr.example.com"]                              # CHANGE
+      secretName: hrms-tls
+  rules:
+    - host: hr.example.com                                   # CHANGE
+      http:
+        paths:
+          - path: /api/clock/(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service: {name: attendance-api, port: {number: 8001}}

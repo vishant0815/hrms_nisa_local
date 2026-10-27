@@ -1,0 +1,40 @@
+# A complete system for a local kind cluster: kubectl apply -k k8s/overlays/kind-test
+# (create the hrms-secrets Secret first). See docs/deployment.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../k8s
+  - dependencies.yaml
+images:
+  - {name: hrms-backend, newTag: test}
+patches:
+  - target: {kind: ConfigMap, name: hrms-config}
+    patch: |-
+      - {op: replace, path: /data/DJANGO_ALLOWED_HOSTS, value: "hr.local,localhost"}
+      - {op: replace, path: /data/CORS_ALLOWED_ORIGINS, value: "http://hr.local"}
+      - {op: replace, path: /data/SITE_URL, value: "http://hr.local"}
+      - {op: replace, path: /data/EMAIL_HOST, value: "mailhog"}
+      - {op: replace, path: /data/EMAIL_PORT, value: "1025"}
+      - {op: replace, path: /data/EMAIL_USE_TLS, value: "false"}
+  - target: {kind: PersistentVolumeClaim, name: private-media}
+    patch: |-
+      - {op: replace, path: /spec/accessModes, value: ["ReadWriteOnce"]}
+  # Probes use the host name the app accepts.
+  - target: {kind: Deployment, name: backend}
+    patch: |-
+      - {op: replace, path: /spec/template/spec/containers/0/readinessProbe/httpGet/httpHeaders/0/value, value: hr.local}
+      - {op: replace, path: /spec/template/spec/containers/0/livenessProbe/httpGet/httpHeaders/0/value, value: hr.local}
+  # A small test cluster: one copy of each is plenty.
+  - target: {kind: Deployment, name: backend}
+    patch: |-
+      - {op: replace, path: /spec/replicas, value: 1}
+  - target: {kind: Deployment, name: attendance-api}
+    patch: |-
+      - {op: replace, path: /spec/replicas, value: 1}
+  - target: {kind: Ingress}
+    patch: |-
+      - {op: replace, path: /spec/rules/0/host, value: hr.local}
+      - {op: remove, path: /spec/tls}
+  - target: {kind: HorizontalPodAutoscaler, name: attendance-api}
+    patch: |-
+      - {op: replace, path: /spec/minReplicas, value: 1}
