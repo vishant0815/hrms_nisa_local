@@ -7,10 +7,13 @@ import Leave from "./pages/Leave.jsx";
 import Payslips from "./pages/Payslips.jsx";
 import Payroll from "./pages/Payroll.jsx";
 import PayRun from "./pages/PayRun.jsx";
+import Rota from "./pages/Rota.jsx";
+import Swaps from "./pages/Swaps.jsx";
 
 export default function App() {
   const { status, user } = useAuth();
   const admin = user && (user.role === "owner" || user.role === "hr");
+  const manager = admin || (user && user.role === "manager");
 
   if (status === "loading") {
     return (
@@ -32,6 +35,8 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/leave" element={<Leave />} />
         <Route path="/payslips" element={<Payslips />} />
+        <Route path="/swaps" element={<Swaps />} />
+        {manager && <Route path="/rota" element={<Rota />} />}
         {admin && <Route path="/payroll" element={<Payroll />} />}
         {admin && <Route path="/payroll/:id" element={<PayRun />} />}
         <Route path="*" element={<Navigate to="/" replace />} />

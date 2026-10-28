@@ -8,6 +8,15 @@ page to check each payslip (earnings, held hours, deductions), agree extra hours
 tax and National Insurance, rebuild the draft, approve, then download the bank file and each payslip PDF. The
 backend decides what is allowed; the page only shows its reasons in plain words.
 
+Part 3 adds **Rota** for managers, HR and the owner (a manager only reaches their own shop) and **Swaps** for everyone:
+
+- Rota: pick a shop and week; create the week (optionally copying last week); add, change and cancel shifts day by day,
+  with saved patterns like Opening and Closing; open shifts are marked; hours per person; publish (with a confirmation).
+  The backend checks every rule (overlaps, rest, hour limits, right to work, opening hours) and its reasons are shown
+  as they come. Days that have passed cannot be changed.
+- Swaps: staff ask a colleague to take a shift, the colleague accepts or declines, then the manager approves or
+  rejects (a rejection needs a reason the staff see). Managers see what rule each swap would break before approving.
+
 ## Run it
 
 ```
@@ -34,10 +43,13 @@ Kubernetes. Use `HRMS_DJANGO` and `HRMS_CLOCK` to point elsewhere.
 
 ## Not built yet
 
-Pay rates, bank and tax details (they belong with the employee screens), the payslip template editor, manager rota and attendance, and employees, visas and leave approvals. Serving the
+Pay rates, bank and tax details (they belong with the employee screens), the payslip template editor, attendance review, and employees, visas and leave approvals. Serving the
 built files from Kubernetes (an image plus an ingress path for `/`) is also still to do.
 
 ## Notes from testing
+
+- The login rate limit (10 a minute per address) also counts token refreshes, which happen whenever the site is opened.
+  Many staff opening the site at once from one shop's internet connection could hit it; see the pull request notes.
 
 - A server error never shows its raw page; the person sees "The server had a problem" instead.
 - Payslips for people with no pay history get income tax £0.00 and a yellow "Check before you confirm" note from the

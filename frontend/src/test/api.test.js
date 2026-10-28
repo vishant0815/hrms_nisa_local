@@ -17,6 +17,10 @@ describe("errorText", () => {
     expect(errorText({ code: "no_shift", message: "You are not rostered to work right now." })).toBe("You are not rostered to work right now.");
     expect(errorText({ problems: ["EMP-0001 is below the minimum wage."] })).toBe("EMP-0001 is below the minimum wage.");
   });
+  it("reads the rota rule problems, one sentence each", () => {
+    const data = { blocks: [{ code: "overlap", message: "Sam already works then." }, { code: "rest", message: "Less than 11 hours rest." }] };
+    expect(errorText(data)).toBe("Sam already works then. Less than 11 hours rest.");
+  });
   it("never shows a server crash page", () => {
     expect(errorText("<!DOCTYPE html><html><title>Error</title></html>")).toMatch(/try again/i);
   });

@@ -167,3 +167,29 @@ main { max-width: 56rem; margin: 0 auto; padding: 0.5rem 1rem 3rem; }
 .plain li:first-child { border-top: 0; }
 .money-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0 1rem; }
 .notice { background: var(--ticket); color: #12202c; border: 2px solid #12202c; border-radius: var(--radius); padding: 0.6rem 0.9rem; margin: 0.8rem 0; max-width: none; }
+
+/* Rota */
+.controls { display: flex; flex-wrap: wrap; gap: 0.6rem 1.5rem; align-items: flex-end; margin-bottom: 1rem; }
+.controls label { margin: 0; min-width: 12rem; }
+.weeknav { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+button.quiet.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.day.today { border-left-color: var(--ticket-deep); }
+.day-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 0.4rem; }
+.day-head h2 { margin: 0; }
+.shifts { list-style: none; margin: 0; padding: 0; }
+.shifts li { display: grid; grid-template-columns: 8.5rem 1fr auto auto; gap: 0.3rem 1rem; align-items: center; padding: 0.5rem 0; border-top: 1px solid var(--line); }
+.shifts li:first-child { border-top: 0; }
+.shifts li.openshift { background: repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 225, 77, 0.28) 8px 16px); padding-left: 0.5rem; }
+.shifts strong { font-stretch: 112%; }
+@media (max-width: 640px) { .shifts li { grid-template-columns: 1fr auto; } .shifts li strong { grid-column: 1 / -1; } }
+.shift-form { border: 2px solid var(--ink); border-radius: var(--radius); padding: 0.8rem 1rem; margin: 0.6rem 0; background: var(--chiller); }
+.shift-form h3 { margin: 0 0 0.6rem; font-size: 1rem; font-stretch: 112%; }
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 1rem; }
+@media (max-width: 560px) { .three { grid-template-columns: 1fr; } }
+.check { display: flex; gap: 0.6rem; align-items: center; font-weight: 500; }
+.check input { width: auto; min-height: 0; margin: 0; }
+button.danger { color: var(--alert); border-color: var(--alert); }
+.reject { margin-top: 0.6rem; }
+.topbar nav { flex-wrap: wrap; }
+.shifts li button { justify-self: start; }

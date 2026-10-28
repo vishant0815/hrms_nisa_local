@@ -71,3 +71,20 @@ describe("payslip state", () => {
     expect(slipState(slip({ gross_pay: "0.00", deductions_confirmed: false })).text).toBe("Ready");
   });
 });
+
+import { mondayOf } from "../format";
+import { shiftText, SWAP_STATUS } from "../pages/Swaps.jsx";
+describe("rota helpers", () => {
+  it("finds the Monday of any day, including Sunday and across a month end", () => {
+    expect(mondayOf("2026-10-28")).toBe("2026-10-26");
+    expect(mondayOf("2026-10-26")).toBe("2026-10-26");
+    expect(mondayOf("2026-11-01")).toBe("2026-10-26"); // a Sunday belongs to the week before
+    expect(mondayOf("2026-11-03")).toBe("2026-11-02");
+  });
+  it("describes a shift in one line", () => {
+    expect(shiftText({ date: "2026-10-29", start_time: "07:00:00", end_time: "15:00:00", store: { name: "Shop A" } })).toBe("Thu 29 Oct, 07:00–15:00 at Shop A");
+  });
+  it("has plain words for every swap status", () => {
+    for (const s of ["pending_colleague", "pending_manager", "approved", "declined", "rejected", "cancelled"]) expect(SWAP_STATUS[s]).toBeTruthy();
+  });
+});

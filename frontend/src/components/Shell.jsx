@@ -5,6 +5,8 @@ const LINKS = [
   { to: "/", label: "Home", end: true },
   { to: "/leave", label: "Leave" },
   { to: "/payslips", label: "Payslips" },
+  { to: "/rota", label: "Rota", roles: ["owner", "hr", "manager"] },
+  { to: "/swaps", label: "Swaps" },
   { to: "/payroll", label: "Payroll", roles: ["owner", "hr"] },
 ];
 
