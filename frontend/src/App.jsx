@@ -8,6 +8,7 @@ import Payslips from "./pages/Payslips.jsx";
 import Payroll from "./pages/Payroll.jsx";
 import PayRun from "./pages/PayRun.jsx";
 import Attendance from "./pages/Attendance.jsx";
+import LeaveRequests from "./pages/LeaveRequests.jsx";
 import Rota from "./pages/Rota.jsx";
 import Swaps from "./pages/Swaps.jsx";
 
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/swaps" element={<Swaps />} />
         {manager && <Route path="/rota" element={<Rota />} />}
         {manager && <Route path="/attendance" element={<Attendance />} />}
+        {manager && <Route path="/leave-requests" element={<LeaveRequests />} />}
         {admin && <Route path="/payroll" element={<Payroll />} />}
         {admin && <Route path="/payroll/:id" element={<PayRun />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
