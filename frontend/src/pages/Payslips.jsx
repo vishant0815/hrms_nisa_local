@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
+import { saveBlob } from "../download";
 import useLoad from "../components/useLoad";
 import { period, pounds } from "../format";
 
@@ -13,14 +14,7 @@ export default function Payslips() {
     setError("");
     try {
       const blob = await api(`/me/payslips/${slip.id}/pdf/`, { blob: true });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `payslip-${slip.number}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      saveBlob(blob, `payslip-${slip.number}.pdf`);
     } catch (e) {
       setError(e.message);
     }

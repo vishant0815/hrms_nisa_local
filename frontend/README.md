@@ -3,6 +3,11 @@
 React + Vite, plain JavaScript. This first part has sign in, and for every account: the clock (in and out), your
 next 7 days of shifts, annual leave (balance, request, cancel) and payslips (list and download).
 
+Part 2 adds **Payroll** for Owner and HR (hidden from everyone else): the list of pay runs, starting one, and a pay-run
+page to check each payslip (earnings, held hours, deductions), agree extra hours, enter statutory sick pay, confirm
+tax and National Insurance, rebuild the draft, approve, then download the bank file and each payslip PDF. The
+backend decides what is allowed; the page only shows its reasons in plain words.
+
 ## Run it
 
 ```
@@ -29,10 +34,14 @@ Kubernetes. Use `HRMS_DJANGO` and `HRMS_CLOCK` to point elsewhere.
 
 ## Not built yet
 
-Screens for Owner/HR payroll, manager rota and attendance, and employees, visas and leave approvals. Serving the
+Pay rates, bank and tax details (they belong with the employee screens), the payslip template editor, manager rota and attendance, and employees, visas and leave approvals. Serving the
 built files from Kubernetes (an image plus an ingress path for `/`) is also still to do.
 
 ## Notes from testing
+
+- A server error never shows its raw page; the person sees "The server had a problem" instead.
+- Payslips for people with no pay history get income tax £0.00 and a yellow "Check before you confirm" note from the
+  backend (it needs the P45 figures or a Week 1/Month 1 code). The page makes that note hard to miss.
 
 - Payslip PDFs downloaded here are **not** password protected; only the emailed copy is.
 - The clock refuses a clock-out in the first minute of a shift and a clock-in when no shift is rostered; the page
