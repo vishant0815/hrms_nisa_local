@@ -70,3 +70,30 @@ export function mondayOf(iso) {
   const back = (date.getDay() + 6) % 7;
   return addDays(iso, -back);
 }
+
+// The UK calendar date of an instant, as "2026-10-28".
+export function ukDate(instant) {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Europe/London" })
+      .formatToParts(new Date(instant)).map((x) => [x.type, x.value]),
+  );
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+// A UK wall-clock date and time ("2026-10-28", "09:30") as the exact instant to send to the server, correct on both
+// sides of the clock change.
+export function ukInstant(date, time) {
+  const [y, m, d] = date.split("-").map(Number);
+  const [h, mi] = time.split(":").map(Number);
+  const wanted = Date.UTC(y, m - 1, d, h, mi);
+  let guess = wanted;
+  for (let i = 0; i < 2; i += 1) {
+    const p = Object.fromEntries(
+      new Intl.DateTimeFormat("en-GB", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Europe/London" })
+        .formatToParts(new Date(guess)).map((x) => [x.type, x.value]),
+    );
+    const shown = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute));
+    guess -= shown - wanted;
+  }
+  return new Date(guess).toISOString();
+}
