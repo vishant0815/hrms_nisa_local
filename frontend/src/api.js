@@ -39,7 +39,8 @@ export function errorText(data, fallback = "Something went wrong. Please try aga
   if (typeof data.detail === "string") return data.detail;
   const parts = [];
   for (const value of Object.values(data)) {
-    if (Array.isArray(value)) parts.push(...value.map(String));
+    // The rota rules send a list of {code, message} objects.
+    if (Array.isArray(value)) parts.push(...value.map((item) => (item && typeof item === "object" ? errorText(item, "") : String(item))));
     else if (typeof value === "string") parts.push(value);
     else if (value && typeof value === "object") parts.push(errorText(value, ""));
   }

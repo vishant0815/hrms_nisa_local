@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import Tickets from "../components/Tickets.jsx";
+import ShiftBars, { span } from "../components/ShiftBars.jsx";
 import Login from "../pages/Login.jsx";
 import { addDays, clock, fullDay, shortDay, greeting, hoursText, isoToday, period, pounds, toDate } from "../format";
 
@@ -33,18 +33,24 @@ describe("dates and money", () => {
   });
 });
 
-describe("shift tickets", () => {
+describe("shift bars", () => {
   const shift = (id, date, extra = {}) => ({ id, date, start_time: "09:00:00", end_time: "17:00:00", hours: "8.00", store: { name: "Shop A" }, role: "", ...extra });
   it("labels today and tomorrow and marks today", () => {
-    render(<Tickets today="2026-10-27" shifts={[shift(1, "2026-10-27"), shift(2, "2026-10-28"), shift(3, "2026-10-30", { role: "Till" })]} />);
+    render(<ShiftBars today="2026-10-27" shifts={[shift(1, "2026-10-27"), shift(2, "2026-10-28"), shift(3, "2026-10-30", { role: "Till" })]} />);
     expect(screen.getByText("Today")).toBeInTheDocument();
     expect(screen.getByText("Tomorrow")).toBeInTheDocument();
     expect(screen.getByText("Shop A, Till")).toBeInTheDocument();
-    expect(document.querySelectorAll(".ticket.today")).toHaveLength(1);
+    expect(document.querySelectorAll(".shiftrow.today")).toHaveLength(1);
     expect(screen.getAllByText("09:00–17:00")).toHaveLength(3);
   });
+  it("places a shift on the 6am to midnight track", () => {
+    expect(span("06:00:00", "24:00:00")).toEqual({ left: "0%", width: "100%" });
+    expect(span("15:00:00", "21:00:00")).toEqual({ left: "50%", width: "33.33333333333333%" });
+    expect(span("22:00:00", "06:00:00").width).toBe("11.11111111111111%"); // runs past midnight: stops at the end
+    expect(span("04:00:00", "09:00:00").left).toBe("0%"); // before 6am: starts at the left edge
+  });
   it("explains an empty week instead of showing nothing", () => {
-    render(<Tickets shifts={[]} />);
+    render(<ShiftBars shifts={[]} />);
     expect(screen.getByText(/No shifts are published/)).toBeInTheDocument();
   });
 });
@@ -69,5 +75,22 @@ describe("payslip state", () => {
     expect(slipState(slip({ deductions_confirmed: false })).text).toBe("Check and confirm");
     expect(slipState(slip()).text).toBe("Ready");
     expect(slipState(slip({ gross_pay: "0.00", deductions_confirmed: false })).text).toBe("Ready");
+  });
+});
+
+import { mondayOf } from "../format";
+import { shiftText, SWAP_STATUS } from "../pages/Swaps.jsx";
+describe("rota helpers", () => {
+  it("finds the Monday of any day, including Sunday and across a month end", () => {
+    expect(mondayOf("2026-10-28")).toBe("2026-10-26");
+    expect(mondayOf("2026-10-26")).toBe("2026-10-26");
+    expect(mondayOf("2026-11-01")).toBe("2026-10-26"); // a Sunday belongs to the week before
+    expect(mondayOf("2026-11-03")).toBe("2026-11-02");
+  });
+  it("describes a shift in one line", () => {
+    expect(shiftText({ date: "2026-10-29", start_time: "07:00:00", end_time: "15:00:00", store: { name: "Shop A" } })).toBe("Thu 29 Oct, 07:00–15:00 at Shop A");
+  });
+  it("has plain words for every swap status", () => {
+    for (const s of ["pending_colleague", "pending_manager", "approved", "declined", "rejected", "cancelled"]) expect(SWAP_STATUS[s]).toBeTruthy();
   });
 });

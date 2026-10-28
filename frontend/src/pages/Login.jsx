@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../auth.jsx";
+import ThemeToggle from "../components/ThemeToggle.jsx";
 
 export default function Login() {
   const { login } = useAuth();
@@ -22,6 +23,9 @@ export default function Login() {
 
   return (
     <main className="signin">
+      <div className="signin-theme">
+        <ThemeToggle />
+      </div>
       <div className="signin-sign">
         <h1>Nisa Local</h1>
         <p>Staff portal for rotas, hours, leave and payslips.</p>

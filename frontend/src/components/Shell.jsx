@@ -1,10 +1,13 @@
 import { NavLink } from "react-router-dom";
 import { ROLE_NAMES, useAuth } from "../auth.jsx";
+import ThemeToggle from "./ThemeToggle.jsx";
 
 const LINKS = [
   { to: "/", label: "Home", end: true },
   { to: "/leave", label: "Leave" },
   { to: "/payslips", label: "Payslips" },
+  { to: "/rota", label: "Rota", roles: ["owner", "hr", "manager"] },
+  { to: "/swaps", label: "Swaps" },
   { to: "/payroll", label: "Payroll", roles: ["owner", "hr"] },
 ];
 
@@ -30,6 +33,7 @@ export default function Shell({ children }) {
             {name}
             <small>{ROLE_NAMES[user.role] || user.role}</small>
           </span>
+          <ThemeToggle />
           <button type="button" className="quiet" onClick={logout}>
             Sign out
           </button>
