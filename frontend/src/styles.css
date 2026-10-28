@@ -133,11 +133,11 @@ input:focus, select:focus { border-color: var(--green-text); }
 
 /* Page frame */
 .shell { min-height: 100vh; }
-.topbar { background: var(--top); color: var(--top-ink); display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.4rem; padding: 0.7rem 1rem; }
+.topbar { background: var(--top); color: var(--top-ink); display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1rem; padding: 0.7rem 1rem; }
 .topbar .brand { font-family: var(--head); font-weight: 800; font-size: 1.2rem; letter-spacing: -0.02em; display: inline-flex; align-items: center; gap: 0.5rem; }
 .topbar .brand::before { content: ""; width: 0.8rem; height: 0.8rem; border-radius: 3px; background: var(--bar); }
 .topbar nav { display: flex; flex-wrap: wrap; gap: 0.2rem; flex: 1; }
-.topbar nav a { color: var(--top-ink); text-decoration: none; padding: 0.45rem 0.8rem; border-radius: var(--radius); font-weight: 600; }
+.topbar nav a { color: var(--top-ink); text-decoration: none; padding: 0.45rem 0.65rem; border-radius: var(--radius); font-weight: 600; }
 .topbar nav a:hover { background: rgba(255, 255, 255, 0.1); }
 .topbar nav a.active { background: var(--top-active); color: #fff; }
 .who { display: flex; align-items: center; gap: 0.8rem; font-weight: 600; }
@@ -145,6 +145,10 @@ input:focus, select:focus { border-color: var(--green-text); }
 .who button.quiet, .who .theme select { color: var(--top-ink); border-color: rgba(255, 255, 255, 0.3); background: transparent; }
 .who .theme select option { color: #1b1f1d; }
 .who button.quiet:hover { border-color: #fff; }
+@media (max-width: 1180px) {
+  .topbar .brand { flex: 1; }
+  .topbar nav { order: 3; flex-basis: 100%; }
+}
 main { max-width: 56rem; margin: 0 auto; padding: 0.5rem 1rem 3rem; }
 @media (max-width: 640px) {
   .who span { display: none; }
@@ -259,3 +263,10 @@ main { max-width: 56rem; margin: 0 auto; padding: 0.5rem 1rem 3rem; }
 .shift-form h3 { margin: 0 0 0.6rem; font-size: 1rem; }
 .reject { margin-top: 0.6rem; }
 .shifts li button { justify-self: start; }
+
+/* Attendance */
+.flags { list-style: none; margin: 0.2rem 0; padding: 0; display: grid; gap: 0.15rem; }
+.rows .flags li { display: block; padding: 0; border: 0; color: var(--amber-ink); font-size: 0.95rem; }
+.rows .flags li::before { content: "\25B8 "; }
+.rows small { color: var(--ink-soft); }
+.rows .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
