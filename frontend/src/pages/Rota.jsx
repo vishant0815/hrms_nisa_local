@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import ShiftForm from "../components/ShiftForm.jsx";
+import { Track } from "../components/ShiftBars.jsx";
 import useLoad from "../components/useLoad";
 import { addDays, clock, hoursText, isoToday, mondayOf, shortDay } from "../format";
 
@@ -157,6 +158,7 @@ export default function Rota() {
                   {byDay(d).map((s) => (
                     <li key={s.id} className={s.employee ? "" : "openshift"}>
                       <strong>{clock(s.start_time)}–{clock(s.end_time)}</strong>
+                      <Track start={s.start_time} end={s.end_time} />
                       <span>{s.employee ? s.employee.name : "Open shift: nobody on it yet"}{s.role ? `, ${s.role}` : ""}</span>
                       <small>{hoursText(s.hours)}</small>
                       {s.date >= today && <button type="button" className="quiet" onClick={() => setForm({ shift: s })}>Change</button>}

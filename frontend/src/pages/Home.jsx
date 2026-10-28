@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth.jsx";
 import ClockPanel from "../components/ClockPanel.jsx";
-import Tickets from "../components/Tickets.jsx";
+import ShiftBars from "../components/ShiftBars.jsx";
 import useLoad from "../components/useLoad";
 import { addDays, greeting, isoToday, period, pounds } from "../format";
 
@@ -42,7 +42,7 @@ export default function Home() {
           <ClockPanel />
           <section className="panel" aria-labelledby="week-title">
             <h2 id="week-title">Your next 7 days</h2>
-            {rota.loading ? <p>Loading your shifts…</p> : rota.error ? <Problem text={rota.error} retry={rota.reload} /> : <Tickets shifts={rota.data} today={today} />}
+            {rota.loading ? <p>Loading your shifts…</p> : rota.error ? <Problem text={rota.error} retry={rota.reload} /> : <ShiftBars shifts={rota.data} today={today} />}
           </section>
           <div className="pair">
             <section className="panel" aria-labelledby="leave-title">

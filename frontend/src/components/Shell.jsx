@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { ROLE_NAMES, useAuth } from "../auth.jsx";
+import ThemeToggle from "./ThemeToggle.jsx";
 
 const LINKS = [
   { to: "/", label: "Home", end: true },
@@ -32,6 +33,7 @@ export default function Shell({ children }) {
             {name}
             <small>{ROLE_NAMES[user.role] || user.role}</small>
           </span>
+          <ThemeToggle />
           <button type="button" className="quiet" onClick={logout}>
             Sign out
           </button>
