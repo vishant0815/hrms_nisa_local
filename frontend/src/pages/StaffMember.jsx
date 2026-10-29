@@ -6,6 +6,7 @@ import useLoad from "../components/useLoad";
 import { isoToday, pounds, shortDay, toDate } from "../format";
 
 const dayMonth = (iso) => toDate(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+import RightToWork from "../components/RightToWork.jsx";
 import { personName } from "./Staff.jsx";
 
 // A little form that saves one thing and says so. `fields` render inside; `onSave` does the call.
@@ -192,6 +193,22 @@ function PayDetails({ id }) {
   );
 }
 
+// What a manager may know: yes or no, the hours limit, and nothing about why.
+function CanWork({ id }) {
+  const d = useLoad(`/employees/${id}/can-work/`);
+  if (!d.data) return null;
+  return (
+    <section className="panel">
+      <h2>Right to work</h2>
+      <p>
+        <strong>{d.data.allowed ? "Can work today." : d.data.message || "Not cleared to work. Please contact HR."}</strong>
+        {d.data.weekly_hours_limit ? ` Limited to ${d.data.weekly_hours_limit} hours a week.` : ""}
+        {d.data.paperwork_needed ? " Some paperwork is still outstanding with HR." : ""}
+      </p>
+    </section>
+  );
+}
+
 export default function StaffMember() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -211,8 +228,10 @@ export default function StaffMember() {
             No. {person.data.employee_number} · {person.data.home_store ? person.data.home_store.name : "No shop"} · {person.data.is_current ? "Working here" : "Has left"}
           </p>
           <Basics key={`b${person.data.end_date}${person.data.phone}${person.data.job_title}`} p={person.data} admin={admin} onSaved={person.reload} />
+          {!admin && <CanWork id={id} />}
           {admin && (
             <>
+              <RightToWork id={id} />
               <HomeShop key={`h${person.data.home_store && person.data.home_store.id}`} p={person.data} stores={stores.data || []} onSaved={person.reload} />
               <Allowance id={id} />
               <PayRates id={id} />

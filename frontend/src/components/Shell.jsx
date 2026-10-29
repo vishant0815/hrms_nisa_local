@@ -10,6 +10,8 @@ const LINKS = [
   { to: "/attendance", label: "Attendance", roles: ["owner", "hr", "manager"] },
   { to: "/leave-requests", label: "Leave requests", roles: ["owner", "hr", "manager"] },
   { to: "/staff", label: "Staff", roles: ["owner", "hr", "manager"] },
+  { to: "/right-to-work", label: "Right to work", roles: ["owner", "hr"] },
+  { to: "/term-letter", label: "Term letter", roles: ["employee"] },
   { to: "/swaps", label: "Swaps" },
   { to: "/payroll", label: "Payroll", roles: ["owner", "hr"] },
 ];

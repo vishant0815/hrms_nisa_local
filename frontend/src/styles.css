@@ -270,3 +270,5 @@ main { max-width: 56rem; margin: 0 auto; padding: 0.5rem 1rem 3rem; }
 .rows .flags li::before { content: "\25B8 "; }
 .rows small { color: var(--ink-soft); }
 .rows .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+.panel h3 { margin: 1.2rem 0 0.4rem; }
+.panel .actions { margin: 0.8rem 0; }

@@ -97,3 +97,6 @@ export function ukInstant(date, time) {
   }
   return new Date(guess).toISOString();
 }
+
+// A date with its year ("25 Aug 2027"), for things that run for months such as visas and term dates.
+export const dateText = (iso) => toDate(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });

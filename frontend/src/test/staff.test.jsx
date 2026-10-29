@@ -19,6 +19,8 @@ vi.mock("../api", () => ({
     if (path === "/employees/") return [person(1, "Sam"), person(2, "Priya", { is_current: false }), person(3, "Ravi", { home_store: { id: 2, name: "Shop B" } })];
     if (path.startsWith("/stores/")) return [{ id: 1, name: "Shop A", is_active: true }, { id: 2, name: "Shop B", is_active: true }];
     if (path === "/employees/1/") return person(1, "Sam");
+    if (path.endsWith("/visas/") || path.endsWith("/rtw-checks/") || path === "/visa-types/") return [];
+    if (path.endsWith("/can-work/")) return { allowed: true, reasons: [], warnings: [], weekly_hours_limit: null, paperwork_needed: false, message: "" };
     if (path.endsWith("/leave-allowance/")) return { year_start: "2026-04-01", year_end: "2027-03-31", allowance: "28.0", used: "3.0", waiting: "0.0", remaining: "25.0" };
     if (path.endsWith("/pay-rates/")) return opts.method === "POST" ? {} : [{ id: 1, hourly_rate: "12.21", effective_from: "2026-04-01" }];
     if (path.endsWith("/pay-details/")) return { ni_number: "AB******C", tax_code: "1257L", ni_category: "A", student_loan_plan: "", postgrad_loan: false, pension_opted_out: false, apprentice_from: null, prior_pay: null, prior_tax: null, account_name: "S Test", sort_code: "**-**-56", account_number: "****4321", has_bank_details: true, date_of_birth: "**/**/1999", has_date_of_birth: true, typical_day_hours: null };
