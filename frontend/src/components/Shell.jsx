@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { ROLE_NAMES, useAuth } from "../auth.jsx";
+import { Brand } from "../branding.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 
 const LINKS = [
@@ -14,6 +15,7 @@ const LINKS = [
   { to: "/term-letter", label: "Term letter", roles: ["employee"] },
   { to: "/swaps", label: "Swaps" },
   { to: "/payroll", label: "Payroll", roles: ["owner", "hr"] },
+  { to: "/branding", label: "Branding", roles: ["owner", "hr"] },
 ];
 
 export default function Shell({ children }) {
@@ -25,7 +27,7 @@ export default function Shell({ children }) {
         <a className="skip" href="#main">
           Skip to content
         </a>
-        <span className="brand">Nisa Local</span>
+        <Brand />
         <nav aria-label="Main">
           {LINKS.filter((link) => !link.roles || link.roles.includes(user.role)).map((link) => (
             <NavLink key={link.to} to={link.to} end={link.end}>

@@ -272,3 +272,12 @@ main { max-width: 56rem; margin: 0 auto; padding: 0.5rem 1rem 3rem; }
 .rows .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
 .panel h3 { margin: 1.2rem 0 0.4rem; }
 .panel .actions { margin: 0.8rem 0; }
+
+/* Logo */
+.topbar .brand.has-logo { background: #fff; border-radius: 6px; padding: 4px 10px; flex: 0 0 auto; margin-right: auto; }
+.topbar .brand.has-logo::before { display: none; }
+.brand img { display: block; height: 28px; max-width: 160px; object-fit: contain; }
+.signin-logo { display: inline-block; align-self: flex-start; background: #fff; border-radius: 8px; padding: 8px 14px; margin-bottom: 1.2rem; }
+.signin-logo img { display: block; height: 44px; max-width: 240px; object-fit: contain; }
+.logo-preview { display: inline-block; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px; margin: 0 0 0.8rem; }
+.logo-preview img { display: block; height: 44px; max-width: 280px; object-fit: contain; }

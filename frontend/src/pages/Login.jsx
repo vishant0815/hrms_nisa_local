@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useAuth } from "../auth.jsx";
+import { Brand, useBranding } from "../branding.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 
 export default function Login() {
   const { login } = useAuth();
+  const { name, logoUrl } = useBranding();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,7 +29,8 @@ export default function Login() {
         <ThemeToggle />
       </div>
       <div className="signin-sign">
-        <h1>Nisa Local</h1>
+        {logoUrl && <Brand className="signin-logo" />}
+        <h1>{name}</h1>
         <p>Staff portal for rotas, hours, leave and payslips.</p>
       </div>
       <form onSubmit={submit} className="signin-form" aria-describedby={error ? "signin-error" : undefined}>
