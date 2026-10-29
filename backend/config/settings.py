@@ -147,7 +147,7 @@ REST_FRAMEWORK = {
     # Deny by default; every view must opt in to broader access.
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.ScopedRateThrottle",),
-    "DEFAULT_THROTTLE_RATES": {"login": "10/min", "upload": "20/hour"},
+    "DEFAULT_THROTTLE_RATES": {"login": "10/min", "refresh": "120/min", "upload": "20/hour"},
     # The frontend sends JSON, so tests do too.
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }
