@@ -7,15 +7,18 @@ import { applyTheme, getTheme } from "./theme";
 import "./styles.css";
 import App from "./App.jsx";
 import { AuthProvider } from "./auth.jsx";
+import { BrandingProvider } from "./branding.jsx";
 
 applyTheme(getTheme()); // before the first paint, so there is no flash of the wrong theme
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      <BrandingProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </BrandingProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );
