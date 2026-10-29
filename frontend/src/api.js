@@ -50,7 +50,9 @@ export function errorText(data, fallback = "Something went wrong. Please try aga
 async function send(path, { method = "GET", body, headers = {} } = {}) {
   const init = { method, headers: { ...headers } };
   if (access) init.headers.Authorization = `Bearer ${access}`;
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    init.body = body; // the browser sets the multipart type, with its boundary
+  } else if (body !== undefined) {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(body);
   }

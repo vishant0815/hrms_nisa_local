@@ -9,6 +9,10 @@ import Payroll from "./pages/Payroll.jsx";
 import PayRun from "./pages/PayRun.jsx";
 import Attendance from "./pages/Attendance.jsx";
 import LeaveRequests from "./pages/LeaveRequests.jsx";
+import RightToWorkDesk from "./pages/RightToWorkDesk.jsx";
+import TermLetters from "./pages/TermLetters.jsx";
+import Staff from "./pages/Staff.jsx";
+import StaffMember from "./pages/StaffMember.jsx";
 import Rota from "./pages/Rota.jsx";
 import Swaps from "./pages/Swaps.jsx";
 
@@ -41,6 +45,10 @@ export default function App() {
         {manager && <Route path="/rota" element={<Rota />} />}
         {manager && <Route path="/attendance" element={<Attendance />} />}
         {manager && <Route path="/leave-requests" element={<LeaveRequests />} />}
+        {manager && <Route path="/staff" element={<Staff />} />}
+        {manager && <Route path="/staff/:id" element={<StaffMember />} />}
+        {admin && <Route path="/right-to-work" element={<RightToWorkDesk />} />}
+        {user.role === "employee" && <Route path="/term-letter" element={<TermLetters />} />}
         {admin && <Route path="/payroll" element={<Payroll />} />}
         {admin && <Route path="/payroll/:id" element={<PayRun />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
