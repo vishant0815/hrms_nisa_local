@@ -1,0 +1,19 @@
+# Keep secrets, local data and junk out of the image
+.env
+.env.*
+!.env.example
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+db.sqlite3
+*.sqlite3
+media/
+private_media/
+staticfiles/
+*.log
+*.pem
+*.key

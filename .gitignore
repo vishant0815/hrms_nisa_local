@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+*.pem
+*.key
 
 # Python
 __pycache__/
@@ -12,9 +14,13 @@ venv/
 .pytest_cache/
 .coverage
 htmlcov/
+.mypy_cache/
+.ruff_cache/
 
 # Django
 db.sqlite3
+*.sqlite3
+*.sqlite3-journal
 staticfiles/
 media/
 private_media/
@@ -23,6 +29,10 @@ private_media/
 node_modules/
 dist/
 build/
+.vite/
+coverage/
+npm-debug.log*
+*.log
 
 # Editors / OS
 .idea/
