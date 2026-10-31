@@ -7,6 +7,7 @@ resources:
   - dependencies.yaml
 images:
   - {name: hrms-backend, newTag: test}
+  - {name: hrms-frontend, newTag: test}
 patches:
   - target: {kind: ConfigMap, name: hrms-config}
     patch: |-
