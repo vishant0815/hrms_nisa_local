@@ -6,6 +6,7 @@ import ThemeToggle from "./ThemeToggle.jsx";
 const LINKS = [
   { to: "/", label: "Home", end: true },
   { to: "/leave", label: "Leave" },
+  { to: "/my-hours", label: "My hours", roles: ["employee"] },
   { to: "/payslips", label: "Payslips" },
   { to: "/rota", label: "Rota", roles: ["owner", "hr", "manager"] },
   { to: "/attendance", label: "Attendance", roles: ["owner", "hr", "manager"] },
