@@ -16,6 +16,7 @@ import Staff from "./pages/Staff.jsx";
 import StaffMember from "./pages/StaffMember.jsx";
 import Rota from "./pages/Rota.jsx";
 import Swaps from "./pages/Swaps.jsx";
+import MyHours from "./pages/MyHours.jsx";
 
 export default function App() {
   const { status, user } = useAuth();
@@ -41,6 +42,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/leave" element={<Leave />} />
+        {user.role === "employee" && <Route path="/my-hours" element={<MyHours />} />}
         <Route path="/payslips" element={<Payslips />} />
         <Route path="/swaps" element={<Swaps />} />
         {manager && <Route path="/rota" element={<Rota />} />}
