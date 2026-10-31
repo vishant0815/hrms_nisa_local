@@ -35,6 +35,15 @@ class AuthTests(APITestCase):
         self.assertIn("access", response.data)
         self.assertIn("refresh", response.data)
 
+    def test_refresh_has_a_higher_limit_than_login(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        refresh = self.login().data["refresh"]
+        for _ in range(15):  # more than the login limit of 10 a minute
+            self.assertEqual(self.client.post(reverse("token-refresh"), {"refresh": refresh}).status_code, 200)
+        cache.clear()
+
     def test_wrong_password_rejected(self):
         self.assertEqual(self.login(password="wrong").status_code, 401)
 

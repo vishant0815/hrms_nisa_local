@@ -18,7 +18,9 @@ class LoginView(TokenObtainPairView):
 
 
 class RefreshView(TokenRefreshView):
-    throttle_scope = "login"
+    # Refreshing needs a valid token, so it cannot be used to guess passwords. It gets its own, higher
+    # limit so many staff sharing one shop connection are not logged out by each other's refreshes.
+    throttle_scope = "refresh"
 
 
 class MeView(APIView):
