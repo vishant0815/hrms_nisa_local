@@ -8,6 +8,7 @@ resources:
   - clamav.yaml
   - backend.yaml
   - attendance-api.yaml
+  - frontend.yaml
   - notifications.yaml
   - cronjobs.yaml
   - ingress.yaml

@@ -9,6 +9,7 @@ storage and resource sizes on the first deploy.
 | Piece | What it is | Copies |
 |---|---|---|
 | `backend` | Django API (gunicorn), everything under `/api/` except the clock | 2 |
+| `frontend` | The website: static files served by nginx (image built from `frontend/`) | 2 |
 | `attendance-api` | Clock-in/out service (FastAPI), scales 2 to 6 on CPU | 2+ |
 | `notification-relay`, `notification-consumer` | Put queued emails on Kafka, then send them (and attach payslip PDFs) | 1 each |
 | `clamav` | Virus scanner. **Uploads are refused whenever it is not answering.** | 1 |
@@ -20,8 +21,8 @@ point `POSTGRES_HOST`, `REDIS_URL` and `KAFKA_BOOTSTRAP_SERVERS` in `k8s/config.
 
 ## First deploy
 
-1. Build and push the image from `backend/` (the same image runs every piece). Replace `hrms-backend:latest` in
-   the YAML with your registry path.
+1. Build and push two images: `backend/` (the same image runs every piece) and `frontend/` (the website). Replace
+   `hrms-backend:latest` and `hrms-frontend:latest` in the YAML with your registry paths.
 2. Edit `k8s/config.yaml` (domain, database host, mail server) and `k8s/ingress.yaml` (domain, TLS secret).
 3. Copy `k8s/secret.example.yaml` to `k8s/secret.yaml`, fill it in (it is git-ignored) and apply it. The
    `PAYROLL_ENCRYPTION_KEY` protects bank details and dates of birth: **back it up somewhere safe**.
@@ -33,8 +34,8 @@ point `POSTGRES_HOST`, `REDIS_URL` and `KAFKA_BOOTSTRAP_SERVERS` in `k8s/config.
 
 ## Things worth knowing
 
-- **Routing**: `/api/clock/*` goes to `attendance-api`, the rest of `/api/` to `backend`. The website will be a
-  third path on the same host when it exists.
+- **Routing**: `/api/clock/*` goes to `attendance-api`, the rest of `/api/` to `backend`. The website (`/`) is the
+  third path on the same host. It is plain files, so it needs no secrets or database.
 - **Health checks** send a `Host` header, because Django rejects requests whose host it does not know. It must be
   one of `DJANGO_ALLOWED_HOSTS`.
 - **Virus scanning** streams each upload to ClamAV before it is stored. ClamAV downloads its definitions on first
@@ -79,3 +80,18 @@ volume, one replica each and plain HTTP on `hr.local`. In that cluster:
 
 To repeat the cluster test: build the image, load it into the cluster, install ingress-nginx, create a `hrms-secrets`
 Secret with throw-away values, then `kubectl apply -k k8s-test` and the migrate job as above.
+
+## Trying it on your own computer (no real site)
+
+This project does not need a public website. To run the whole thing, including the website, on a throw-away local
+cluster (kind or minikube) with ingress-nginx:
+
+1. `docker build -t hrms-backend:test backend` and `docker build -t hrms-frontend:test frontend`, then load both into
+   the cluster (`kind load docker-image hrms-backend:test hrms-frontend:test`).
+2. Create the `hrms-secrets` Secret with throw-away values, then `kubectl apply -k k8s-test` and the migrate job.
+3. Add `127.0.0.1 hr.local` to your hosts file and open `http://hr.local`.
+
+The website image on its own was checked as a non-root container with a read-only filesystem and all capabilities
+dropped: `/healthz` answers, `/` and page addresses such as `/leave` return the app, missing files under `/assets/`
+return 404, and built files are cached for a year while `index.html` is never cached. The full image build and the
+frontend pods inside a cluster have **not** been tried yet (this machine could not reach a cluster).

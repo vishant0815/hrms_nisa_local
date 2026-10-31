@@ -1,6 +1,6 @@
 # Routing for an nginx ingress controller. /api/clock/... goes to the clock service (second Ingress below, which
 # strips the /api prefix because that service serves /clock/...) and the rest of /api/ to Django. TLS needs a certificate secret (for example from cert-manager).
-# The website itself is not here yet: when the frontend exists, add a "/" path pointing at its service.
+# The website (everything else, "/") goes to the frontend service.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -22,6 +22,10 @@ spec:
             pathType: Prefix
             backend:
               service: {name: backend, port: {number: 8000}}
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: frontend, port: {number: 8080}}
 ---
 # The clock service serves /clock/in, /clock/out and so on, so /api/clock/X is rewritten to /clock/X. A regex path
 # is matched before the plain /api/ prefix above, so this wins for clock requests.
